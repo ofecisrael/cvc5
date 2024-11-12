@@ -1,0 +1,12 @@
+(include "rules/Booleans.eo")
+(include "theories/Ints.eo")
+(include "programs/Arith.eo")
+(include "theories/Strings.eo")
+(include "rules/Strings.eo")
+(include "programs/Strings.eo")
+(include "rules/Strings.eo")
+(include "rules/Rewrites.eo")
+(include "rules/Uf.eo")
+
+(include "rules/Regex.eo")
+(include "programs/Regex.eo")
