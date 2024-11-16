@@ -1,3 +1,5 @@
+(include "../theories/Arith.eo")
+
 ; The nfa type.
 
 (declare-type Nfa ())
@@ -6,6 +8,9 @@
 (define State () String) ; TODO try to avoid strings
 
 (declare-const nfa.epsilon String)
+(declare-const nfa.allchar String)
+(declare-const nfa.range (-> String String String))
+
 (declare-const nfa.decline State)
 
 ; nfa.trans "s" "a" "a" (nfa.trans "s" "b" "a" (nfa.decline))
@@ -17,9 +22,19 @@
 
 
 (program $get_trans_rec ((r RegLan) (trans State) (start State) (accept State)
-                        (s String) (r1 RegLan) (rr RegLan :list))
+                        (s String) (r1 RegLan) (rr RegLan :list) (c0 String) (c1 String))
   (RegLan State State State) State ; regex trans start accept
     (
+        (($get_trans_rec (re.opt r1) trans start accept)  ($get_trans_rec (re.union r1 (str.to_re "")) trans start accept))
+        
+        (($get_trans_rec re.none trans start accept)  (trans))
+
+        (($get_trans_rec re.all trans start accept)  ($get_trans_rec (re.* re.allchar) trans start accept))
+
+        (($get_trans_rec re.allchar trans start accept)  (nfa.trans start nfa.allchar accept trans))
+
+        (($get_trans_rec (re.range c0 c1) trans start accept)  (nfa.trans start (nfa.range c0 c1) accept trans))
+
         (($get_trans_rec (re.++ r1 rr) trans start accept)  (eo::define ((lhs_s (eo::concat start "l")))
                                                             (eo::define ((lhs_a (eo::concat accept "l")))
                                                             (eo::define ((rhs_s (eo::concat start "r")))
@@ -30,8 +45,7 @@
                                                             (eo::define ((trans3 (nfa.trans rhs_a nfa.epsilon accept trans2)))
 
                                                             (eo::define ((trans4 ($get_trans_rec r1 trans3 lhs_s lhs_a)))
-                                                            (eo::define ((trans5 ($get_trans_rec rr trans4 rhs_s rhs_a)))
-                                                            trans5))))))))))
+                                                            ($get_trans_rec rr trans4 rhs_s rhs_a))))))))))
 
         (($get_trans_rec (re.+ r1) trans start accept)  (eo::define ((lhs_s (eo::concat start "l")))
                                                         (eo::define ((lhs_a (eo::concat accept "l")))
@@ -67,8 +81,7 @@
                                                                 (eo::define ((trans3 (nfa.trans rhs_a nfa.epsilon accept trans2)))
 
                                                                 (eo::define ((trans4 ($get_trans_rec r1 trans3 lhs_s lhs_a)))
-                                                                (eo::define ((trans5 ($get_trans_rec rr trans4 rhs_s rhs_a)))
-                                                                trans5)))))))))))
+                                                                ($get_trans_rec rr trans4 rhs_s rhs_a)))))))))))
         
         (($get_trans_rec (str.to_re s) trans start accept)  (eo::define ((lhs_s (eo::concat start "l")))
                                                             (eo::define ((char (eo::extract s 0 0)))
@@ -81,13 +94,6 @@
     )
 )
 
-;(program $re_to_nfa_rec ((r RegLan) (s String))
-;  (RegLan) Nfa
-;  (
-;
-;  )
-;)
-
 (program $is_state_in_list  ((state State) (states State)
                             (state0 State))
   (State State) Bool ; state states
@@ -99,13 +105,25 @@
   )
 )
 
+(program $add_state ((states State) (new_state State))
+  (State State) State ; state states -> states
+  (
+    (($add_state new_state states) (eo::ite ($is_state_in_list new_state states) states (nfa.list new_state states)))
+  )
+)
+
 (program $get_next_states   ((state State) (c String) (trans State) (states State)
-                            (next State) (state0 State) (state1 State) (state2 State) (c0 String))
+                            (next State) (state0 State) (state1 State) (state2 State) (c0 String) (c1 String) (c2 String))
   (State String State State) State ; <current_state> <char> <trans> <states> -> state_list
   (
     (($get_next_states state c nfa.decline states) states)
 
-    (($get_next_states state c (nfa.trans state c next trans) states) ($get_next_states state c trans (eo::ite ($is_state_in_list next states) states (nfa.list next states))))
+    (($get_next_states state c (nfa.trans state c next trans) states) ($get_next_states state c trans ($add_state next states)))
+
+    (($get_next_states state c (nfa.trans state nfa.allchar next trans) states) ($get_next_states state c trans ($add_state next states)))
+
+    (($get_next_states state c (nfa.trans state (nfa.range c0 c1) next trans) states) ($get_next_states state c trans 
+                                                                                        (eo::ite (eo::is_eq c nfa.epsilon) states (eo::ite (eo::and ($compare_geq (eo::to_z c) (eo::to_z c0)) ($compare_geq (eo::to_z c1) (eo::to_z c))) ($add_state next states) states))))
 
     (($get_next_states state c (nfa.trans state0 c0 next trans) states) ($get_next_states state c trans states))
   )
