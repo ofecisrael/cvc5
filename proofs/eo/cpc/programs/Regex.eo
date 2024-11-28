@@ -150,10 +150,10 @@
   )
 )
 
-(program $str_in_re_with_nfa ((r RegLan) (s String))
+(program $str_eval_str_in_re_nfa ((r RegLan) (s String))
   (String RegLan) Bool
   (
-    ;(($str_in_re_with_nfa s r)  ($get_trans_rec r nfa.decline "s" "a"))
-    (($str_in_re_with_nfa s r)  ($str_in_nfa s ($get_trans_rec r nfa.decline "s" "a")))
+    ;(($str_eval_str_in_re_nfa s r)  ($get_trans_rec r nfa.decline "s" "a"))
+    (($str_eval_str_in_re_nfa s r)  ($str_in_nfa s ($get_trans_rec r nfa.decline "s" "a")))
   )
 )
