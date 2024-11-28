@@ -105,27 +105,27 @@
   )
 )
 
-(program $add_state ((states State) (new_state State))
-  (State State) State ; state states -> states
+(program $add_state ((states State) (new_state State) (visited State))
+  (State State State) State ; state states visited -> states
   (
-    (($add_state new_state states) (eo::ite ($is_state_in_list new_state states) states (nfa.list new_state states)))
+    (($add_state new_state states visited) (eo::ite (eo::or ($is_state_in_list new_state states) ($is_state_in_list new_state visited))  states (nfa.list new_state states)))
   )
 )
 
-(program $get_next_states   ((state State) (c String) (trans State) (states State)
+(program $get_next_states   ((state State) (c String) (trans State) (states State) (visited State)
                             (next State) (state0 State) (state1 State) (state2 State) (c0 String) (c1 String) (c2 String))
-  (State String State State) State ; <current_state> <char> <trans> <states> -> state_list
+  (State String State State State) State ; <current_state> <char> <trans> <visited> <states> -> state_list
   (
-    (($get_next_states state c nfa.decline states) states)
+    (($get_next_states state c nfa.decline visited states) states)
 
-    (($get_next_states state c (nfa.trans state c next trans) states) ($get_next_states state c trans ($add_state next states)))
+    (($get_next_states state c (nfa.trans state c next trans) visited states) ($get_next_states state c trans visited ($add_state next states visited)))
 
-    (($get_next_states state c (nfa.trans state nfa.allchar next trans) states) ($get_next_states state c trans ($add_state next states)))
+    (($get_next_states state c (nfa.trans state nfa.allchar next trans) visited states) ($get_next_states state c trans visited ($add_state next states visited)))
 
-    (($get_next_states state c (nfa.trans state (nfa.range c0 c1) next trans) states) ($get_next_states state c trans 
-                                                                                        (eo::ite (eo::is_eq c nfa.epsilon) states (eo::ite (eo::and ($compare_geq (eo::to_z c) (eo::to_z c0)) ($compare_geq (eo::to_z c1) (eo::to_z c))) ($add_state next states) states))))
+    (($get_next_states state c (nfa.trans state (nfa.range c0 c1) next trans) visited states) ($get_next_states state c trans 
+                                                                                        (eo::ite (eo::is_eq c nfa.epsilon) states (eo::ite (eo::and ($compare_geq (eo::to_z c) (eo::to_z c0)) ($compare_geq (eo::to_z c1) (eo::to_z c))) ($add_state next states visited) states))))
 
-    (($get_next_states state c (nfa.trans state0 c0 next trans) states) ($get_next_states state c trans states))
+    (($get_next_states state c (nfa.trans state0 c0 next trans) visited states) ($get_next_states state c trans visited states))
   )
 )
 
@@ -137,8 +137,8 @@
     (($match nfa.epsilon "" nfa.decline nexts trans) nexts)
     (($match nfa.epsilon s nfa.decline nexts trans) ($match (eo::extract s 0 0) (eo::extract s 1 (eo::len s)) nexts nfa.decline trans))
     (($match c s nfa.decline nexts trans) ($match nfa.epsilon s nexts nfa.decline trans))
-    (($match nfa.epsilon s (nfa.list state0 states) nexts trans) ($match nfa.epsilon s ($get_next_states state0 nfa.epsilon trans states) (nfa.list state0 nexts) trans))
-    (($match c s (nfa.list state0 states) nexts trans) ($match c s states ($get_next_states state0 c trans nexts) trans))
+    (($match nfa.epsilon s (nfa.list state0 states) nexts trans) ($match nfa.epsilon s ($get_next_states state0 nfa.epsilon trans nexts states) (nfa.list state0 nexts) trans))
+    (($match c s (nfa.list state0 states) nexts trans) ($match c s states ($get_next_states state0 c trans nexts nexts) trans))
   )
 )
 
