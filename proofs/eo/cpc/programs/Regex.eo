@@ -27,7 +27,7 @@
     (
         (($get_trans_rec (re.opt r1) trans start accept)  ($get_trans_rec (re.union r1 (str.to_re "")) trans start accept))
         
-        (($get_trans_rec re.none trans start accept)  (trans))
+        (($get_trans_rec re.none trans start accept)  trans)
 
         (($get_trans_rec re.all trans start accept)  ($get_trans_rec (re.* re.allchar) trans start accept))
 
@@ -81,7 +81,8 @@
                                                                 (eo::define ((trans3 (nfa.trans rhs_a nfa.epsilon accept trans2)))
 
                                                                 (eo::define ((trans4 ($get_trans_rec r1 trans3 lhs_s lhs_a)))
-                                                                ($get_trans_rec rr trans4 rhs_s rhs_a)))))))))))
+                                                                (eo::define ((trans5 ($get_trans_rec rr trans4 rhs_s rhs_a)))
+                                                                trans5)))))))))))
         
         (($get_trans_rec (str.to_re s) trans start accept)  (eo::define ((lhs_s (eo::concat start "l")))
                                                             (eo::define ((char (eo::extract s 0 0)))
@@ -120,9 +121,11 @@
 
     (($get_next_states state c (nfa.trans state c next trans) visited states) ($get_next_states state c trans visited ($add_state next states visited)))
 
+    (($get_next_states state nfa.epsilon (nfa.trans state0 c0 next trans) visited states) ($get_next_states state nfa.epsilon trans visited states))
+
     (($get_next_states state c (nfa.trans state nfa.allchar next trans) visited states) ($get_next_states state c trans visited ($add_state next states visited)))
 
-    (($get_next_states state c (nfa.trans state (nfa.range c0 c1) next trans) visited states) ($get_next_states state c trans 
+    (($get_next_states state c (nfa.trans state (nfa.range c0 c1) next trans) visited states) ($get_next_states state c trans visited
                                                                                         (eo::ite (eo::is_eq c nfa.epsilon) states (eo::ite (eo::and ($compare_geq (eo::to_z c) (eo::to_z c0)) ($compare_geq (eo::to_z c1) (eo::to_z c))) ($add_state next states visited) states))))
 
     (($get_next_states state c (nfa.trans state0 c0 next trans) visited states) ($get_next_states state c trans visited states))
@@ -138,7 +141,7 @@
     (($match nfa.epsilon s nfa.decline nexts trans) ($match (eo::extract s 0 0) (eo::extract s 1 (eo::len s)) nexts nfa.decline trans))
     (($match c s nfa.decline nexts trans) ($match nfa.epsilon s nexts nfa.decline trans))
     (($match nfa.epsilon s (nfa.list state0 states) nexts trans) ($match nfa.epsilon s ($get_next_states state0 nfa.epsilon trans nexts states) (nfa.list state0 nexts) trans))
-    (($match c s (nfa.list state0 states) nexts trans) ($match c s states ($get_next_states state0 c trans nexts nexts) trans))
+    (($match c s (nfa.list state0 states) nexts trans) ($match c s states ($get_next_states state0 c trans nexts nexts) trans)) ; TODO
   )
 )
 
