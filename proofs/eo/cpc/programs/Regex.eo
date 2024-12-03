@@ -15,7 +15,7 @@
 
 ; nfa.trans "s" "a" "a" (nfa.trans "s" "b" "a" (nfa.decline))
 (declare-const nfa.trans (-> State String State State)) ; state action new_state otherwise
-(declare-const nfa.list (-> State State State))
+(declare-const nfa.list (-> State State State) :right-assoc-nil nfa.decline)
 
 ;(declare-const nfa.str_to_state (-> String State))
 
@@ -99,14 +99,11 @@
                             (state0 State))
   (State State) Bool ; state states
   (
-    (($is_state_in_list state (nfa.list state states))    true)
-    (($is_state_in_list state nfa.decline)   false)
-    (($is_state_in_list state (nfa.list state0 nfa.decline))   false)
-    (($is_state_in_list state (nfa.list state0 states))   ($is_state_in_list state states))
+    (($is_state_in_list state states)    (eo::not (eo::is_neg (eo::list_find nfa.list states state))))
   )
 )
 
-(program $add_state ((states State) (new_state State) (visited State))
+(program $add_state ((states State :list) (new_state State) (visited State))
   (State State State) State ; state states visited -> states
   (
     (($add_state new_state states visited) (eo::ite (eo::or ($is_state_in_list new_state states) ($is_state_in_list new_state visited))  states (nfa.list new_state states)))
@@ -133,7 +130,7 @@
 )
 
 
-(program $match ((c String) (s String) (states State) (nexts State) (trans State)
+(program $match ((c String) (s String) (states State :list) (nexts State :list) (trans State)
                 (state0 State))
   (String String State State State) State ; current_char rest_string current_states next_states transitions -> end_states
   (
@@ -148,8 +145,8 @@
 (program $str_in_nfa ((s String) (trans State))
   (String State) Bool ; string trans -> bool
   (
-    ;(($str_in_nfa s trans)  ($match nfa.epsilon s (nfa.list "s" nfa.decline) nfa.decline trans))
-    (($str_in_nfa s trans)  ($is_state_in_list "a" ($match nfa.epsilon s (nfa.list "s" nfa.decline) nfa.decline trans)))
+    ;(($str_in_nfa s trans)  ($match nfa.epsilon s (nfa.list "s") nfa.decline trans))
+    (($str_in_nfa s trans)  ($is_state_in_list "a" ($match nfa.epsilon s (nfa.list "s") nfa.decline trans)))
   )
 )
 
