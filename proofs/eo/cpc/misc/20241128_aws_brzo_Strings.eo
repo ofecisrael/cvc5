@@ -1547,7 +1547,7 @@
     (($simplify_regexp (re.++ re.none rr))          re.none)
     (($simplify_regexp (re.++ r1 rr))               (eo::ite (eo::is_eq ($simplify_regexp r1) (str.to_re ""))
                                                       ($simplify_regexp rr)
-                                                      (re.++ ($simplify_regexp r1) ($simplify_regexp rr))
+                                                      (eo::cons re.++ ($simplify_regexp r1) ($simplify_regexp rr))
                                                     )
                                                     )
     (($simplify_regexp r1)                          r1)
