@@ -1,3 +1,6 @@
+; Optimize epsilon moves, decrease states count
+; regress10 18.5
+
 (include "../theories/Arith.eo")
 
 ; The nfa type.
@@ -48,8 +51,7 @@
         
         (($get_trans_rec @re.empty trans start accept path) (nfa.trans start nfa.epsilon accept trans))
 
-        (($get_trans_rec (str.to_re s) trans start accept path) 
-(eo::define ((char (eo::extract s 0 0)))
+        (($get_trans_rec (str.to_re s) trans start accept path) (eo::define ((char (eo::extract s 0 0)))
                                                                 (eo::define ((s1n (eo::extract s 1 (eo::len s))))
 
                                                                 (eo::ite (eo::is_eq s1n "") (nfa.trans start char accept trans)
