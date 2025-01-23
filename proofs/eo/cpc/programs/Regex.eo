@@ -7,7 +7,7 @@
 
 (declare-const nfa.epsilon nfa.char)
 (declare-const nfa.allchar nfa.char)
-(declare-const nfa.range (-> String String nfa.char))
+(declare-const nfa.range (-> nfa.char nfa.char nfa.char))
 
 (declare-type nfa.trans ())
 (declare-const nfa.index.null nfa.index)
@@ -50,15 +50,20 @@
   )
 )
 
-;(re.union r1 rr)
-;(re.* r1)
-;(re.++ r1 rr)
-;(str.to_re s)
-; I should return here (start, accept, table)
 (program $get_trans ((r RegLan) (table nfa.trans) (state nfa.trans) (start nfa.trans :list) (start_i nfa.index) (accept nfa.trans :list) (accept_i nfa.index)
-                    (s String) (len Int) (r1 RegLan) (rr RegLan :list))
+                    (s String) (len Int) (r1 RegLan) (rr RegLan :list) (c0 nfa.char) (c1 nfa.char))
   (RegLan nfa.trans nfa.index nfa.trans nfa.index Int) nfa.trans ; regex start start_i accept accept_i len -> start,accept,table
   (
+    (($get_trans (re.opt r1) start start_i accept accept_i len) ($get_trans (re.union r1 @re.empty) start start_i accept accept_i len))
+
+    (($get_trans re.none start start_i accept accept_i len) (nfa.config.init start accept nfa.trans.null len))
+
+    (($get_trans re.all start start_i accept accept_i len) ($get_trans (re.* re.allchar) start start_i accept accept_i len))
+
+    (($get_trans re.allchar start start_i accept accept_i len) (nfa.config.init ($add_trans start nfa.allchar accept_i) accept nfa.trans.null len))
+
+    (($get_trans (re.range c0 c1) start start_i accept accept_i len) (nfa.config.init ($add_trans start (nfa.range c0 c1) accept_i) accept nfa.trans.null len))
+
     (($get_trans (re.union r1 rr) start start_i accept accept_i len) (eo::match ((start0 nfa.trans) (accept0 nfa.trans) (table0 nfa.trans) (len0 Int))
                                                                                       ($get_trans r1 start start_i accept accept_i len)
                                                                             (
@@ -71,6 +76,8 @@
                                                                             ))
                                                                             )
                                                                     ))
+
+    (($get_trans (re.+ r1) start start_i accept accept_i len) ($get_trans r1 start start_i ($add_trans accept nfa.epsilon start_i) accept_i len))
 
     (($get_trans (re.* r1) start start_i accept accept_i len) ($get_trans r1 ($add_trans start nfa.epsilon accept_i) start_i ($add_trans accept nfa.epsilon start_i) accept_i len))
 
@@ -127,19 +134,27 @@
   )
 )
 
-(program $get_next_states   ((c nfa.char) (c0 nfa.char) (trans nfa.trans :list) (states nfa.index :list) (visited nfa.index :list) (i nfa.index))
+(program $in_range ((c nfa.char) (c0 nfa.char) (c1 nfa.char))
+  (nfa.char nfa.char) Bool ; char range -> bool
+  (
+    (($in_range c (nfa.range c0 c1)) (eo::and ($compare_geq (eo::to_z c) (eo::to_z c0)) ($compare_geq (eo::to_z c1) (eo::to_z c))))
+  )
+)
+
+(program $get_next_states   ((c nfa.char) (c0 nfa.char) (c1 nfa.char) (trans nfa.trans :list) (states nfa.index :list) (visited nfa.index :list) (i nfa.index))
   (nfa.char nfa.trans nfa.index nfa.index) nfa.index ; <char> <trans> <visited> <states> -> state_list
   (
     (($get_next_states c nfa.trans.null visited states) states)
 
     (($get_next_states c (nfa.trans.list (nfa.trans.init c i) trans) visited states) ($get_next_states c trans visited ($add_index visited states i)))
 
+    (($get_next_states nfa.epsilon (nfa.trans.list (nfa.trans.init c0 i) trans) visited states) ($get_next_states nfa.epsilon trans visited states))
+
+    (($get_next_states c (nfa.trans.list (nfa.trans.init nfa.allchar i) trans) visited states) ($get_next_states c trans visited ($add_index visited states i)))
+
+    (($get_next_states c (nfa.trans.list (nfa.trans.init (nfa.range c0 c1) i) trans) visited states) (eo::define (( states0 ( eo::ite ($in_range c (nfa.range c0 c1)) ($add_index visited states i) states ) )) ($get_next_states c trans visited states0)) )
+
     (($get_next_states c (nfa.trans.list (nfa.trans.init c0 i) trans) visited states) ($get_next_states c trans visited states))
-
-    ;(($get_next_states state c (nfa.trans state nfa.allchar next trans) visited states) ($get_next_states state c trans visited ($add_state next states visited)))
-    ;(($get_next_states state c (nfa.trans state (nfa.range c0 c1) next trans) visited states) ($get_next_states state c trans visited
-    ;                                                                                    (eo::ite (eo::is_eq c nfa.epsilon) states (eo::ite (eo::and ($compare_geq (eo::to_z c) (eo::to_z c0)) ($compare_geq (eo::to_z c1) (eo::to_z c))) ($add_state next states visited) states))))
-
   )
 )
 
@@ -161,7 +176,7 @@
   (
     ;(($str_eval_str_in_re_nfa s r)  (eo::define (( a ($get_trans r nfa.trans.null 0 nfa.trans.null 1 2))) false))
 
-    ;(($str_eval_str_in_re_nfa s r)  ($merge ($get_trans r nfa.trans.null 0 nfa.trans.null 1 2)))
+    (($str_eval_str_in_re_nfa s r)  ($merge ($get_trans r nfa.trans.null 0 nfa.trans.null 1 2)))
 
     (($str_eval_str_in_re_nfa s r)  ($is_index_in_list 
                                       ($match nfa.epsilon s (nfa.index.list 0) nfa.index.null ($merge ($get_trans r nfa.trans.null 0 nfa.trans.null 1 2))) 1))
