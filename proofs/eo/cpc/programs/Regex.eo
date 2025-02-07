@@ -174,12 +174,11 @@
 (program $str_eval_str_in_re_nfa ((r RegLan) (s String))
   (String RegLan) Bool
   (
-    ;(($str_eval_str_in_re_nfa s r)  (eo::define (( a ($get_trans r nfa.trans.null 0 nfa.trans.null 1 2))) false))
+    ;(($str_eval_str_in_re_nfa s r)  (eo::define (( a ($merge ($get_trans r nfa.trans.null 0 nfa.trans.null 1 2)))) false))
 
-    (($str_eval_str_in_re_nfa s r)  ($merge ($get_trans r nfa.trans.null 0 nfa.trans.null 1 2)))
+    ;(($str_eval_str_in_re_nfa s r)  ($merge ($get_trans r nfa.trans.null 0 nfa.trans.null 1 2)))
 
     (($str_eval_str_in_re_nfa s r)  ($is_index_in_list 
                                       ($match nfa.epsilon s (nfa.index.list 0) nfa.index.null ($merge ($get_trans r nfa.trans.null 0 nfa.trans.null 1 2))) 1))
-    ;(($str_eval_str_in_re_nfa s r)  ($merge_config ($get_trans r nfa.null nfa.null 0 nfa.null 1)))
   )
 )
