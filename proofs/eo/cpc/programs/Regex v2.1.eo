@@ -117,12 +117,11 @@
     )
 
     (($add_to_nexts (nfa.trans.list (nfa.trans.init nfa.epsilon t) tt) st nexts stacks) 
-      (eo::ite (eo::is_neg (eo::list_find nfa.trans.list nexts (nfa.trans.init nfa.epsilon t)))
       (eo::match ((nexts0 nfa.trans) (stacks0 nfa.trans))
-                  ($add_to_nexts ($as_list t) st (eo::cons nfa.trans.list (nfa.trans.init nfa.epsilon t) nexts) (eo::cons nfa.trans.list nfa.trans.null stacks))
+                  ($add_to_nexts ($as_list t) st nexts stacks)
                 (
                 ((nfa.trans.list nexts0 stacks0) ($add_to_nexts tt st nexts0 stacks0))
-        )) ($add_to_nexts tt st nexts stacks))
+        ))
     )
 
     (($add_to_nexts (nfa.trans.list t tt) st nexts stacks) (eo::ite (eo::is_neg (eo::list_find nfa.trans.list nexts t))
