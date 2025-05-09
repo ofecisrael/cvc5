@@ -283,6 +283,7 @@ std::size_t String::roverlap(const String &y) const {
 }
 
 std::string String::toString(bool useEscSequences) const {
+  useEscSequences = true;
   std::stringstream str;
   for (unsigned int i = 0; i < size(); ++i) {
     // we always print backslash as a code point so that it cannot be

@@ -423,6 +423,7 @@ bool RegExpEntail::isConstRegExp(TNode t)
 
 bool RegExpEntail::testConstStringInRegExp(String& s, TNode r)
 {
+  bool ret;
   Kind k = r.getKind();
   if (k == Kind::REGEXP_CONCAT || k == Kind::REGEXP_STAR
       || k == Kind::REGEXP_UNION)
@@ -433,10 +434,16 @@ bool RegExpEntail::testConstStringInRegExp(String& s, TNode r)
     // be simpler.
     if (RegExpEval::canEvaluate(r))
     {
-      return RegExpEval::evaluate(s, r);
+      ret = RegExpEval::evaluate(s, r);
+      goto done;
     }
   }
-  return testConstStringInRegExpInternal(s, 0, r);
+
+  ret = testConstStringInRegExpInternal(s, 0, r);
+  done:
+  // std::string ret_str = ret ? "true" : "false";
+  // Trace("regexp-str-in-re-eval") << "(step @p :rule str-in-re-eval :args ((= (str.in_re " << s << " " << r << ")  " << ret ? "true" : "false" << ")))" << std::endl;
+  return ret;
 }
 
 bool RegExpEntail::testConstStringInRegExpInternal(String& s,
@@ -853,6 +860,7 @@ bool RegExpEntail::regExpIncludes(Node r1,
     {
       String s = r2[0].getConst<String>();
       ret = testConstStringInRegExp(s, r1);
+      Trace("regexp-str-in-re-eval") << "(step @p :rule str-in-re-eval :args ((= (str.in_re \"" << s.toString(true) << "\" " << r1.toString() << ")  " << (ret ? "true" : "false") << ")))" << std::endl;
     }
     cache[key] = ret;
     return ret;
