@@ -1,0 +1,94 @@
+(define nfa.char () String)
+
+(declare-const nfa.epsilon nfa.char)
+(declare-const nfa.allchar nfa.char)
+(declare-const nfa.range (-> Int Int nfa.char))
+(declare-const nfa.push nfa.char)
+(declare-const nfa.pop nfa.char)
+(declare-const nfa.none nfa.char)
+
+
+(declare-type nfa.trans ())
+(declare-const nfa.trans.null nfa.trans)
+(declare-const nfa.trans.decline nfa.trans)
+(declare-const nfa.trans.list (-> nfa.trans nfa.trans nfa.trans) :right-assoc-nil nfa.trans.null)
+(declare-const nfa.trans.stack (-> nfa.trans nfa.trans nfa.trans) :right-assoc-nil nfa.trans.null)
+(declare-const nfa.trans.init (-> nfa.char nfa.trans nfa.trans))
+
+(program $as_list ((t nfa.trans) (tt nfa.trans :list))
+  (nfa.trans) nfa.trans
+  (
+    (($as_list (nfa.trans.list t tt)) (nfa.trans.list t tt))
+    (($as_list t) (nfa.trans.list t))
+  )
+)
+
+
+(program $get_trans ((r RegLan) (tail nfa.trans) (s String) (r1 RegLan) (rr RegLan :list))
+  (RegLan) nfa.trans ; regex tail -> new_tail
+  (
+    (($get_trans r) ($as_list ($get_trans_rec r nfa.trans.null)))
+  )
+)
+
+(program $in_list ((t nfa.trans) (tt nfa.trans))
+  (nfa.trans nfa.trans) Bool
+  (
+    (($in_list tt t)    (eo::not (eo::is_neg (eo::list_find nfa.trans.list tt t))))
+  )
+)
+
+
+(program $as_uion ((t RegLan) (tt RegLan :list))
+  (RegLan) RegLan
+  (
+    (($as_uion (re.union t tt)) (re.union t tt))
+    (($as_uion t) (re.union t))
+  )
+)
+
+(program $preprocess ((regex RegLan) (tail RegLan) (s String)(r1 RegLan) (rr RegLan :list) (c0 String) (c1 String))
+  (RegLan RegLan) RegLan ; regex tail -> new_tail
+  (
+    (($preprocess re.all tail) ($preprocess (re.* re.allchar) tail))
+    (($preprocess (re.opt r1) tail) ($preprocess (re.union @re.empty r1) tail))
+    (($preprocess (re.+ r1) tail) ($preprocess (re.++ r1 (re.* r1)) tail))
+
+    (($preprocess (re.range c0 c1) tail) (re.++ (re.range c0 c1) tail))
+    
+    (($preprocess (re.* r1) tail) (re.++ (re.* r1) tail))
+
+    (($preprocess re.allchar tail) (re.++ re.allchar tail))
+
+    (($preprocess re.none tail) re.none)
+
+    (($preprocess (re.union r1 rr) tail)
+      (eo::define ((r1n ($preprocess r1 tail)))
+      (eo::define ((rrn ($preprocess rr tail)))
+      (eo::list_concat re.union ($as_uion r1n) rrn)
+      )))
+    
+    (($preprocess (re.++ r1 rr) tail) ($preprocess r1 ($preprocess rr tail)))
+
+    (($preprocess @re.empty tail) (re.++ @re.empty tail))
+
+    (($preprocess (str.to_re s) tail)  (re.++ (str.to_re s) tail))
+  )
+)
+
+(program $preprocess_merge ((r RegLan) (s String) (rr RegLan :list) (r1 RegLan) (rr1 RegLan :list) (r2 RegLan) (rr2 RegLan :list))
+  (RegLan) RegLan
+  (
+    (($preprocess_merge (re.opt r)) (re.opt ($preprocess_merge r)))
+    (($preprocess_merge (re.* r)) (re.* ($preprocess_merge r)))
+    (($preprocess_merge (re.++ r rr)) (re.++ ($preprocess_merge r) ($preprocess_merge rr)))
+
+    (($preprocess_merge (re.union (re.union r1 rr1) rr)) ($preprocess_merge (re.union r1 rr1 rr)))
+
+    (($preprocess_merge (re.union (re.++ r r1 rr1) (re.++ r r2 rr2) rr)) ($preprocess_merge (re.union (re.++ r (re.union (re.++ r1 rr1) (re.++ r2 rr2))) rr)))
+    
+    (($preprocess_merge (re.union r rr)) (re.union r ($preprocess_merge rr)))
+
+    (($preprocess_merge r) r)
+  )
+)
