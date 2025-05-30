@@ -1,0 +1,184 @@
+(include "../theories/Arith.eo")
+
+; table = [("a", 1),("b", 4),()],[(),()], ..
+
+(define nfa.index () Int)
+(define nfa.char () String)
+
+(declare-const nfa.epsilon nfa.char)
+(declare-const nfa.allchar nfa.char)
+(declare-const nfa.range (-> nfa.char nfa.char nfa.char))
+
+(declare-type nfa.trans ())
+(declare-const nfa.index.null nfa.index)
+(declare-const nfa.trans.null nfa.trans)
+(declare-const nfa.trans.init (-> nfa.char nfa.index nfa.trans))
+(declare-const nfa.trans.list (-> nfa.trans nfa.trans nfa.trans) :right-assoc-nil nfa.trans.null)
+;(declare-const nfa.trans.table (-> nfa.trans nfa.trans nfa.trans) :right-assoc-nil nfa.trans.null)
+(declare-const nfa.index.list (-> nfa.index nfa.index nfa.index) :right-assoc-nil nfa.index.null)
+
+(declare-type nfa.config ())
+(declare-const nfa.config.init (-> nfa.trans nfa.trans nfa.trans Int nfa.config)) ; start accept table len
+
+
+(program $merge ((start nfa.trans) (accept nfa.trans) (table nfa.trans :list) (t nfa.trans) (len Int))
+  (nfa.config) nfa.trans
+  (
+    (($merge (nfa.config.init start accept table len))  (eo::cons nfa.trans.list start (eo::cons nfa.trans.list accept table)))
+  )
+)
+
+
+(program $add_trans ((c nfa.char) (i nfa.index) (trans nfa.trans :list))
+  (nfa.trans nfa.char nfa.index) nfa.trans ; trans char index -> trans
+  (
+    (($add_trans trans c i)  (nfa.trans.list (nfa.trans.init c i) trans))
+  )
+)
+
+(program $add_to_table ((state nfa.trans) (table nfa.trans))
+  (nfa.trans nfa.trans) nfa.trans ; state table -> table
+  (
+    (($add_to_table state table)  (eo::cons nfa.trans.list state table))
+  )
+)
+
+(program $merge_table_to_config ((table nfa.trans) (config nfa.config) (start nfa.trans) (accept nfa.trans) (table0 nfa.trans) (len Int))
+  (nfa.trans nfa.config) nfa.config ; table config -> config
+  (
+    (($merge_table_to_config table (nfa.config.init start accept table0 len))  (nfa.config.init start accept (eo::list_concat nfa.trans.list table table0) len))
+  )
+)
+
+(program $get_trans ((r RegLan) (table nfa.trans) (state nfa.trans) (start nfa.trans :list) (start_i nfa.index) (accept nfa.trans :list) (accept_i nfa.index)
+                    (s String) (len Int) (r1 RegLan) (rr RegLan :list) (c0 nfa.char) (c1 nfa.char))
+  (RegLan nfa.trans nfa.index nfa.trans nfa.index Int) nfa.trans ; regex start start_i accept accept_i len -> start,accept,table
+  (
+    (($get_trans (re.opt r1) start start_i accept accept_i len) ($get_trans (re.union r1 @re.empty) start start_i accept accept_i len))
+
+    (($get_trans re.none start start_i accept accept_i len) (nfa.config.init start accept nfa.trans.null len))
+
+    (($get_trans re.all start start_i accept accept_i len) ($get_trans (re.* re.allchar) start start_i accept accept_i len))
+
+    (($get_trans re.allchar start start_i accept accept_i len) (nfa.config.init ($add_trans start nfa.allchar accept_i) accept nfa.trans.null len))
+
+    (($get_trans (re.range c0 c1) start start_i accept accept_i len) (nfa.config.init ($add_trans start (nfa.range c0 c1) accept_i) accept nfa.trans.null len))
+
+    (($get_trans (re.union r1 rr) start start_i accept accept_i len) (eo::match ((start0 nfa.trans) (accept0 nfa.trans) (table0 nfa.trans) (len0 Int))
+                                                                                      ($get_trans r1 start start_i accept accept_i len)
+                                                                            (
+                                                                            ((nfa.config.init start0 accept0 table0 len0) 
+                                                                            (eo::match ((start1 nfa.trans) (accept1 nfa.trans) (table1 nfa.trans) (len1 Int))
+                                                                                      ($get_trans rr start0 start_i accept0 accept_i len0)
+                                                                            (
+                                                                            ((nfa.config.init start1 accept1 table1 len1) (nfa.config.init start1 accept1 (eo::list_concat nfa.trans.list table0 table1) len1))
+                                                                            )
+                                                                            ))
+                                                                            )
+                                                                    ))
+
+    (($get_trans (re.+ r1) start start_i accept accept_i len) ($get_trans r1 start start_i ($add_trans accept nfa.epsilon start_i) accept_i len))
+
+    (($get_trans (re.* r1) start start_i accept accept_i len) ($get_trans r1 ($add_trans start nfa.epsilon accept_i) start_i ($add_trans accept nfa.epsilon start_i) accept_i len))
+
+    (($get_trans (re.++ r1 rr) start start_i accept accept_i len) (eo::define ((lhs_s len))
+                                                                    (eo::match ((start0 nfa.trans) (accept0 nfa.trans) (table0 nfa.trans) (len0 Int))
+                                                                                      ($get_trans r1 start start_i nfa.trans.null lhs_s (eo::add len 1))
+                                                                            (
+                                                                            ((nfa.config.init start0 accept0 table0 len0) 
+                                                                            (eo::match ((start1 nfa.trans) (accept1 nfa.trans) (table1 nfa.trans) (len1 Int))
+                                                                                      ($get_trans rr accept0 lhs_s accept accept_i len0)
+                                                                            (
+                                                                            ((nfa.config.init start1 accept1 table1 len1) (nfa.config.init start0 accept1 (eo::list_concat nfa.trans.list ($add_to_table start1 table0) table1) len1))
+                                                                            )
+                                                                            ))
+                                                                            )
+                                                                    )
+                                                                  ))
+
+    (($get_trans re.none start start_i accept accept_i len)  (nfa.config.init start accept nfa.trans.null len))
+    (($get_trans (re.union r1 rr) start start_i accept accept_i len) (eo::match ((start0 nfa.trans) (accept0 nfa.trans) (table0 nfa.trans) (len0 Int))
+                                                                                      ($get_trans r1 start start_i accept accept_i len)
+                                                                            (
+                                                                            ((nfa.config.init start0 accept0 table0 len0) ($merge_table_to_config table0 ($get_trans rr start0 start_i accept0 accept_i len0)))
+                                                                            )
+                                                                          ))
+    (($get_trans @re.empty start start_i accept accept_i len) (nfa.config.init ($add_trans start nfa.epsilon accept_i) accept nfa.trans.null len))           
+    (($get_trans (str.to_re s) start start_i accept accept_i len) (eo::define ((char (eo::extract s 0 0)))
+                                                                        (eo::define ((s1n (eo::extract s 1 (eo::len s))))
+
+                                                                        (eo::ite (eo::is_eq s1n "")
+                                                                          (nfa.config.init ($add_trans start char accept_i) accept nfa.trans.null len)
+
+                                                                          (eo::define ((lhs_s len))
+                                                                          (eo::match  ((start0 nfa.trans) (accept0 nfa.trans) (table0 nfa.trans) (len0 Int))
+                                                                                      ($get_trans (str.to_re s1n) nfa.trans.null lhs_s accept accept_i (eo::add 1 lhs_s))
+                                                                            (
+                                                                            ((nfa.config.init start0 accept0 table0 len0) (nfa.config.init ($add_trans start char lhs_s) accept0 ($add_to_table start0 table0) len0))
+                                                                            )
+                                                                          ))))))
+  )
+)
+
+(program $is_index_in_list  ((ii nfa.index :list) (i nfa.index))
+  (nfa.index nfa.index) Bool ; indexes index -> bool
+  (
+    (($is_index_in_list ii i)    (eo::not (eo::is_neg (eo::list_find nfa.index.list ii i))))
+  )
+)
+
+(program $add_index ((ii nfa.index :list) (i nfa.index) (visited nfa.index))
+  (nfa.index nfa.index nfa.index) nfa.index ; visited states state -> states
+  (
+    (($add_index visited ii i) (eo::ite (eo::or ($is_index_in_list ii i) ($is_index_in_list visited i)) ii (nfa.index.list i ii)))
+  )
+)
+
+(program $in_range ((c nfa.char) (c0 nfa.char) (c1 nfa.char))
+  (nfa.char nfa.char) Bool ; char range -> bool
+  (
+    (($in_range c (nfa.range c0 c1)) (eo::and ($compare_geq (eo::to_z c) (eo::to_z c0)) ($compare_geq (eo::to_z c1) (eo::to_z c))))
+  )
+)
+
+(program $get_next_states   ((c nfa.char) (c0 nfa.char) (c1 nfa.char) (trans nfa.trans :list) (states nfa.index :list) (visited nfa.index :list) (i nfa.index))
+  (nfa.char nfa.trans nfa.index nfa.index) nfa.index ; <char> <trans> <visited> <states> -> state_list
+  (
+    (($get_next_states c nfa.trans.null visited states) states)
+
+    (($get_next_states c (nfa.trans.list (nfa.trans.init c i) trans) visited states) ($get_next_states c trans visited ($add_index visited states i)))
+
+    (($get_next_states nfa.epsilon (nfa.trans.list (nfa.trans.init c0 i) trans) visited states) ($get_next_states nfa.epsilon trans visited states))
+
+    (($get_next_states c (nfa.trans.list (nfa.trans.init nfa.allchar i) trans) visited states) ($get_next_states c trans visited ($add_index visited states i)))
+
+    (($get_next_states c (nfa.trans.list (nfa.trans.init (nfa.range c0 c1) i) trans) visited states) (eo::define (( states0 ( eo::ite ($in_range c (nfa.range c0 c1)) ($add_index visited states i) states ) )) ($get_next_states c trans visited states0)) )
+
+    (($get_next_states c (nfa.trans.list (nfa.trans.init c0 i) trans) visited states) ($get_next_states c trans visited states))
+  )
+)
+
+(program $match ((c String) (s String) (states nfa.index :list) (nexts nfa.index :list) (trans nfa.trans)
+                (state0 nfa.index))
+  (nfa.char String nfa.index nfa.index nfa.trans) nfa.index ; current_char rest_string current_states next_states transitions -> end_states
+  (
+    (($match nfa.epsilon "" nfa.index.null nexts trans) nexts)
+    (($match nfa.epsilon s nfa.index.null nexts trans) ($match (eo::extract s 0 0) (eo::extract s 1 (eo::len s)) nexts nfa.index.null trans))
+    (($match c s nfa.index.null nexts trans) ($match nfa.epsilon s nexts nfa.index.null trans))
+    (($match nfa.epsilon s (nfa.index.list state0 states) nexts trans)  ($match nfa.epsilon s ($get_next_states nfa.epsilon (eo::list_nth nfa.trans.list trans state0) nexts states) (nfa.index.list state0 nexts) trans))
+    (($match c s (nfa.index.list state0 states) nexts trans)  ($match c s states ($get_next_states c (eo::list_nth nfa.trans.list trans state0) nfa.index.null nexts) trans))
+  )
+)
+
+
+(program $str_eval_str_in_re_nfa ((r RegLan) (s String))
+  (String RegLan) Bool
+  (
+    ;(($str_eval_str_in_re_nfa s r)  (eo::define (( a ($merge ($get_trans r nfa.trans.null 0 nfa.trans.null 1 2)))) false))
+
+    ;(($str_eval_str_in_re_nfa s r)  ($merge ($get_trans r nfa.trans.null 0 nfa.trans.null 1 2)))
+
+    (($str_eval_str_in_re_nfa s r)  ($is_index_in_list 
+                                      ($match nfa.epsilon s (nfa.index.list 0) nfa.index.null ($merge ($get_trans r nfa.trans.null 0 nfa.trans.null 1 2))) 1))
+  )
+)

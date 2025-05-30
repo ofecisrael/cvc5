@@ -1,0 +1,202 @@
+
+(define nfa.index () Int)
+(define nfa.char () String)
+
+(declare-const nfa.epsilon nfa.char)
+(declare-const nfa.allchar nfa.char)
+;(declare-const nfa.range (-> nfa.char nfa.char nfa.char))
+(declare-const nfa.range (-> Int Int nfa.char))
+
+(declare-const nfa.push nfa.char)
+(declare-const nfa.pop nfa.char)
+
+
+(declare-type nfa.trans ())
+
+(declare-const nfa.trans.null nfa.trans)
+(declare-const nfa.trans.decline nfa.trans)
+
+(declare-const nfa.trans.list (-> nfa.trans nfa.trans nfa.trans) :right-assoc-nil nfa.trans.null)
+(declare-const nfa.trans.init (-> nfa.char nfa.trans nfa.trans))
+
+
+(program $to_list ((t nfa.trans) (tt nfa.trans :list))
+  (nfa.trans) nfa.trans
+  (
+    (($to_list nfa.trans.null) nfa.trans.null)
+    (($to_list (nfa.trans.list t tt)) (nfa.trans.list t tt))
+    (($to_list t) (nfa.trans.list t))
+  )
+)
+
+(program $as_list ((t nfa.trans) (tt nfa.trans :list))
+  (nfa.trans) nfa.trans
+  (
+    (($as_list (nfa.trans.list t tt)) (nfa.trans.list t tt))
+    (($as_list t) (nfa.trans.list t))
+  )
+)
+
+
+(program $get_trans_rec ((regex RegLan) (tail nfa.trans) (s String)(r1 RegLan) (rr RegLan :list) (c0 String) (c1 String))
+  (RegLan nfa.trans) nfa.trans ; regex tail -> new_tail
+  (
+    (($get_trans_rec re.all tail) ($get_trans_rec (re.* re.allchar) tail))
+    (($get_trans_rec (re.opt r1) tail) ($get_trans_rec (re.union @re.empty r1) tail))
+    (($get_trans_rec (re.+ r1) tail) ($get_trans_rec (re.++ r1 (re.* r1)) tail))
+
+
+
+    ;(($get_trans_rec (re.range c0 c1) tail) ($get_trans_rec (str.to_re "a") tail))
+    (($get_trans_rec (re.range c0 c1) tail) (nfa.trans.init (nfa.range (eo::to_z c0) (eo::to_z c1)) tail))
+    
+    (($get_trans_rec (re.* r1) tail) (eo::cons nfa.trans.list (nfa.trans.init nfa.push ($get_trans_rec r1 (nfa.trans.init nfa.pop tail))) ($as_list tail)))
+
+    (($get_trans_rec re.allchar tail) (nfa.trans.init nfa.allchar tail))
+
+    (($get_trans_rec re.none tail) nfa.trans.null)
+
+    (($get_trans_rec (re.union r1 rr) tail) 
+      (eo::define ((r1n ($get_trans_rec r1 tail))) 
+      (eo::define ((rrn ($get_trans_rec rr tail))) 
+      (eo::list_concat nfa.trans.list ($to_list r1n) rrn)
+      )
+      ))
+    
+    (($get_trans_rec (re.++ r1 rr) tail) ($get_trans_rec r1 ($get_trans_rec rr tail)))
+
+    (($get_trans_rec @re.empty tail) (nfa.trans.init nfa.epsilon tail))
+
+    (($get_trans_rec (str.to_re s) tail)  
+      (eo::define ((char (eo::extract s 0 0)))
+      (eo::define ((s1n (eo::extract s 1 (eo::len s))))
+      (eo::ite (eo::is_eq s1n "")
+        (nfa.trans.init char tail) 
+        (eo::define ((tail0 ($get_trans_rec (str.to_re s1n) tail))) (nfa.trans.init char tail0)
+      ))
+      )))
+  )
+)
+
+
+
+(program $get_trans ((r RegLan) (tail nfa.trans) (s String)(r1 RegLan) (rr RegLan :list))
+  (RegLan) nfa.trans ; regex tail -> new_tail
+  (
+    (($get_trans r) ($to_list ($get_trans_rec r nfa.trans.null)))
+  )
+)
+
+(program $insert  ((e nfa.trans) (l nfa.trans))
+  (nfa.trans nfa.trans) nfa.trans ; elem list
+  (
+    (($insert e l) (eo::cons nfa.trans.list e l))
+  )
+)
+
+(program $add_to_nexts  ((t nfa.trans) (st nfa.trans) (tt nfa.trans :list) (stt nfa.trans :list) (nexts nfa.trans) (stacks nfa.trans))
+  (nfa.trans nfa.trans nfa.trans nfa.trans) nfa.trans ; new s nexts stacks -> nexts,stacks
+  (
+    (($add_to_nexts nfa.trans.null st nexts stacks) (nfa.trans.list nexts stacks))
+
+    (($add_to_nexts (nfa.trans.list (nfa.trans.init nfa.push t) tt) st nexts stacks) 
+      (eo::match ((nexts0 nfa.trans) (stacks0 nfa.trans))
+                  ($add_to_nexts ($as_list t) ($insert t st) nexts stacks)
+                (
+                ((nfa.trans.list nexts0 stacks0) ($add_to_nexts tt st nexts0 stacks0))
+      ))
+    )
+
+    
+    (($add_to_nexts (nfa.trans.list (nfa.trans.init nfa.pop t) tt) (nfa.trans.list st stt) nexts stacks) 
+      (eo::match ((nexts0 nfa.trans) (stacks0 nfa.trans))
+                  ($add_to_nexts ($as_list t) stt nexts stacks)
+                (
+                ((nfa.trans.list nexts0 stacks0) ($add_to_nexts (eo::list_concat nfa.trans.list ($as_list st) tt) (nfa.trans.list st stt) nexts0 stacks0))
+        ))
+    )
+
+    (($add_to_nexts (nfa.trans.list (nfa.trans.init nfa.epsilon t) tt) st nexts stacks) 
+      (eo::ite (eo::is_neg (eo::list_find nfa.trans.list nexts (nfa.trans.init nfa.epsilon t)))
+      (eo::match ((nexts0 nfa.trans) (stacks0 nfa.trans))
+                  ($add_to_nexts ($as_list t) st (eo::cons nfa.trans.list (nfa.trans.init nfa.epsilon t) nexts) (eo::cons nfa.trans.list nfa.trans.null stacks))
+                (
+                ((nfa.trans.list nexts0 stacks0) ($add_to_nexts tt st nexts0 stacks0))
+        )) ($add_to_nexts tt st nexts stacks))
+    )
+
+    (($add_to_nexts (nfa.trans.list t tt) st nexts stacks) (eo::ite (eo::is_neg (eo::list_find nfa.trans.list nexts t))
+                                                            ($add_to_nexts tt st (eo::cons nfa.trans.list t nexts) (eo::cons nfa.trans.list st stacks)) 
+                                                            ($add_to_nexts tt st nexts stacks)))
+  )
+)
+
+(program $match ((c String) (c0 String) (s String) (nexts nfa.trans) (tt nfa.trans :list) (t nfa.trans)
+                (stack1 nfa.trans) (stack2 nfa.trans) (st nfa.trans) (stt nfa.trans :list)
+                (z0 Int) (z1 Int))
+  (nfa.char String nfa.trans nfa.trans nfa.trans nfa.trans) nfa.trans ; current_char rest_string current_states next_states transitions -> end_states
+  (
+    (($match c s nfa.trans.null nfa.trans.null nfa.trans.null nfa.trans.null) nfa.trans.null)
+    (($match c "" nfa.trans.null stack1 nexts stack2) nexts)
+
+    ;(($match "" s (nfa.trans.list t tt) stack1 nexts stack2) ($match "" s tt stack1 (eo::cons nfa.trans.list t nexts) (eo::cons nfa.trans.list nfa.trans.null stack2)))
+    (($match "" s t nfa.trans.null nfa.trans.null nfa.trans.null) 
+      (eo::match ((nexts0 nfa.trans) (stacks0 nfa.trans))
+                  ($add_to_nexts t nfa.trans.null nfa.trans.null nfa.trans.null)
+                (
+                ((nfa.trans.list nexts0 stacks0) ($match "" s nfa.trans.null nfa.trans.null nexts0 stacks0))
+        ))
+    )
+
+    (($match c s nfa.trans.null stack1 nexts stack2) ($match (eo::extract s 0 0) (eo::extract s 1 (eo::len s)) nexts stack2 nfa.trans.null nfa.trans.null))
+
+    ;(($match c s (nfa.trans.list (nfa.trans.init c t) tt) (nfa.trans.list st stt) nexts stack2)  ($match c s tt stt (eo::list_concat nfa.trans.list ($to_list t) nexts) (eo::cons nfa.trans.list st stack2)))
+    (($match c s (nfa.trans.list (nfa.trans.init c t) tt) (nfa.trans.list st stt) nexts stack2)  
+        (eo::match ((nexts0 nfa.trans) (stacks0 nfa.trans))
+                  ($add_to_nexts ($as_list t) st nexts stack2)
+                (
+                ((nfa.trans.list nexts0 stacks0) ($match c s tt stt nexts0 stacks0))
+        ))
+    )
+
+    (($match c s (nfa.trans.list (nfa.trans.init nfa.allchar t) tt) (nfa.trans.list st stt) nexts stack2)  
+        (eo::match ((nexts0 nfa.trans) (stacks0 nfa.trans))
+                  ($add_to_nexts ($as_list t) st nexts stack2)
+                (
+                ((nfa.trans.list nexts0 stacks0) ($match c s tt stt nexts0 stacks0))
+        ))
+    )
+
+    (($match c s (nfa.trans.list (nfa.trans.init (nfa.range z0 z1) t) tt) (nfa.trans.list st stt) nexts stack2)
+      (eo::ite (eo::and ($compare_geq (eo::to_z c) z0) ($compare_geq z1 (eo::to_z c)))
+        (eo::match ((nexts0 nfa.trans) (stacks0 nfa.trans))
+                  ($add_to_nexts ($as_list t) st nexts stack2)
+                (
+                ((nfa.trans.list nexts0 stacks0) ($match c s tt stt nexts0 stacks0))
+        ))
+        ($match c s tt stt nexts stack2))
+    )
+
+    (($match c s (nfa.trans.list t tt) (nfa.trans.list st stt) nexts stack2)  ($match c s tt stt nexts stack2))
+  )
+)
+
+(program $in_list  ((t nfa.trans) (tt nfa.trans))
+  (nfa.trans nfa.trans) Bool
+  (
+    (($in_list tt t)    (eo::not (eo::is_neg (eo::list_find nfa.trans.list tt t))))
+  )
+)
+
+(program $str_eval_str_in_re_nfa ((r RegLan) (s String))
+  (String RegLan) Bool
+  (
+    ;(($str_eval_str_in_re_nfa s r)  (eo::list_len nfa.trans.list nfa.trans.null))
+    ;(($str_eval_str_in_re_nfa s r)  (eo::list_find nfa.trans.list nfa.trans.null nfa.trans.null))
+    ;(($str_eval_str_in_re_nfa s r)  ($get_trans r))
+    ;(($str_eval_str_in_re_nfa s r)  ($match "" s ($get_trans r) nfa.trans.null nfa.trans.null nfa.trans.null))
+    ;;(($str_eval_str_in_re_nfa s r)  (eo::define ((r1n ($match "" s ($get_trans r) nfa.trans.null nfa.trans.null nfa.trans.null))) true))
+
+    (($str_eval_str_in_re_nfa s r)  ($in_list ($match "" s ($get_trans r) nfa.trans.null nfa.trans.null nfa.trans.null) nfa.trans.null))
+  )
+)
