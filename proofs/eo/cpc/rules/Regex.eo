@@ -1,8 +1,0 @@
-(include "../programs/Regex.eo")
-
-; rule: str-in-re-eval-nfa
-(declare-rule str-in-re-eval-nfa ((s String) (r RegLan) (b Bool))
-  :args ((= (str.in_re s r) b))
-  :requires ((($str_eval_str_in_re_nfa s r) b))
-  :conclusion (= (str.in_re s r) b)
-)

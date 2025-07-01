@@ -1,6 +1,6 @@
 (include "../theories/Strings.eo")
 (include "../theories/Quantifiers.eo")
-(include "../programs/Strings.eo")
+(include "../programs/Strings_aws.eo")
 
 ;;-------------------- Core
 
@@ -465,6 +465,8 @@
              (($str_arith_entail_simple_pred (>= m 0)) true))
   :conclusion (= (>= n 0) (>= m 0))
 )
+(include "../programs/Nfa.eo")
+;(declare-oracle-fun oracleStats (RegLan Bool) Bool ../programs/oracle_stats.py)
 
 ; rule: str-in-re-eval
 ; implements: ProofRewriteRule::STR_IN_RE_EVAL
@@ -475,7 +477,7 @@
 ; conclusion: The given equality.
 (declare-rule str-in-re-eval ((s String) (r RegLan) (b Bool))
   :args ((= (str.in_re s r) b))
-  :requires ((($str_eval_str_in_re s r) b))
+  :requires ((($str_eval_str_in_re_nfa s r) b))
   :conclusion (= (str.in_re s r) b)
 )
 
