@@ -2514,10 +2514,11 @@ enum ENUM(ProofRewriteRule)
    *   \texttt{distinct}(t_1, t_2) = \neg (t_1 = t2)
    *
    * if :math:`n = 2`, or
-   * 
+   *
    * .. math::
    *
-   *   \texttt{distinct}(t_1, \ldots, tn) = \bigwedge_{i=1}^n \bigwedge_{j=i+1}^n t_i \neq t_j
+   *   \texttt{distinct}(t_1, \ldots, tn) = \bigwedge_{i=1}^n
+   * \bigwedge_{j=i+1}^n t_i \neq t_j
    *
    * if :math:`n > 2`
    *
@@ -2647,11 +2648,14 @@ enum ENUM(ProofRewriteRule)
    *   (>= s t) = c
    *
    * where :math:`c` is a Boolean constant.
-   * This macro is elaborated by applications of :cpp:enumerator:`EVALUATE <cvc5::ProofRule::EVALUATE>`,
-   * :cpp:enumerator:`ARITH_POLY_NORM <cvc5::ProofRule::ARITH_POLY_NORM>`,
-   * :cpp:enumerator:`ARITH_STRING_PRED_ENTAIL <cvc5::ProofRewriteRule::ARITH_STRING_PRED_ENTAIL>`,
-   * :cpp:enumerator:`ARITH_STRING_PRED_SAFE_APPROX <cvc5::ProofRewriteRule::ARITH_STRING_PRED_SAFE_APPROX>`,
-   * as well as other rewrites for normalizing arithmetic predicates.
+   * This macro is elaborated by applications of :cpp:enumerator:`EVALUATE
+   * <cvc5::ProofRule::EVALUATE>`, :cpp:enumerator:`ARITH_POLY_NORM
+   * <cvc5::ProofRule::ARITH_POLY_NORM>`,
+   * :cpp:enumerator:`ARITH_STRING_PRED_ENTAIL
+   * <cvc5::ProofRewriteRule::ARITH_STRING_PRED_ENTAIL>`,
+   * :cpp:enumerator:`ARITH_STRING_PRED_SAFE_APPROX
+   * <cvc5::ProofRewriteRule::ARITH_STRING_PRED_SAFE_APPROX>`, as well as other
+   * rewrites for normalizing arithmetic predicates.
    *
    * \endverbatim
    */
@@ -2709,13 +2713,15 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *   ((\lambda x_1 \ldots x_n.\> t) \ t_1 \ldots t_n) = t\{x_1 \mapsto t_1, \ldots, x_n \mapsto t_n\}
+   *   ((\lambda x_1 \ldots x_n.\> t) \ t_1 \ldots t_n) = t\{x_1 \mapsto t_1,
+   * \ldots, x_n \mapsto t_n\}
    *
    * or alternatively
    *
    * .. math::
    *
-   *   ((\lambda x_1 \ldots x_n.\> t) \ t_1) = (\lambda x_2 \ldots x_n.\> t)\{x_1 \mapsto t_1\}
+   *   ((\lambda x_1 \ldots x_n.\> t) \ t_1) = (\lambda x_2 \ldots x_n.\>
+   * t)\{x_1 \mapsto t_1\}
    *
    * In the former case, the left hand side may either be a term of kind
    * `cvc5::Kind::APPLY_UF` or `cvc5::Kind::HO_APPLY`. The latter case is used
@@ -2744,15 +2750,16 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *   ((\lambda x_1 \ldots x_n.\> t) \ t_1 \ldots t_n) = ((\lambda y_1 \ldots y_n.\> t') \ t_1 \ldots t_n)
+   *   ((\lambda x_1 \ldots x_n.\> t) \ t_1 \ldots t_n) = ((\lambda y_1 \ldots
+   * y_n.\> t') \ t_1 \ldots t_n)
    *
    * The terms may either be of kind
    * `cvc5::Kind::APPLY_UF` or `cvc5::Kind::HO_APPLY`.
-   * This rule ensures that the free variables of :math:`y_1, \ldots, y_n, t_1 \ldots t_n`
-   * do not occur in binders within :math:`t'`, and
-   * :math:`(\lambda x_1 \ldots x_n.\> t)` is alpha-equivalent to
-   * :math:`(\lambda y_1 \ldots y_n.\> t')`. This rule is applied prior to
-   * beta reduction to ensure there is no variable capturing.
+   * This rule ensures that the free variables of :math:`y_1, \ldots, y_n, t_1
+   * \ldots t_n` do not occur in binders within :math:`t'`, and :math:`(\lambda
+   * x_1 \ldots x_n.\> t)` is alpha-equivalent to :math:`(\lambda y_1 \ldots
+   * y_n.\> t')`. This rule is applied prior to beta reduction to ensure there
+   * is no variable capturing.
    *
    * \endverbatim
    */
@@ -2869,7 +2876,9 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *   (\forall X.\> F_1 \vee \cdots \vee (\forall Y.\> F_i) \vee \cdots \vee F_n) = (\forall X Z.\> F_1 \vee \cdots \vee F_i\{ Y \mapsto Z \} \vee \cdots \vee F_n)
+   *   (\forall X.\> F_1 \vee \cdots \vee (\forall Y.\> F_i) \vee \cdots \vee
+   * F_n) = (\forall X Z.\> F_1 \vee \cdots \vee F_i\{ Y \mapsto Z \} \vee
+   * \cdots \vee F_n)
    *
    * \endverbatim
    */
@@ -2913,7 +2922,8 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *   \forall X.\> F_1 \vee \ldots \vee F_n = (\forall X_1.\> F_1) \vee \ldots \vee (\forall X_n.\> F_n)
+   *   \forall X.\> F_1 \vee \ldots \vee F_n = (\forall X_1.\> F_1) \vee \ldots
+   * \vee (\forall X_n.\> F_n)
    *
    * where :math:`X = X_1 \ldots X_n`, and the right hand side does not have any
    * free variable in :math:`X`.
@@ -2927,7 +2937,8 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *   \forall X.\> \ite{C}{F_1}{F_2} = \ite{C}{\forall X.\> F_1}{\forall X.\> F_2}
+   *   \forall X.\> \ite{C}{F_1}{F_2} = \ite{C}{\forall X.\> F_1}{\forall X.\>
+   * F_2}
    *
    * where :math:`C` does not have any free variable in :math:`X`.
    *
@@ -2940,12 +2951,13 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *   (\forall x Y.\> F) = (\forall X_1 Y. F_1) \vee \cdots \vee (\forall X_n Y. F_n)
+   *   (\forall x Y.\> F) = (\forall X_1 Y. F_1) \vee \cdots \vee (\forall X_n
+   * Y. F_n)
    *
    * where :math:`x` is of a datatype type with constructors
    * :math:`C_1, \ldots, C_n`, where for each :math:`i = 1, \ldots, n`,
    * :math:`F_i` is :math:`F \{ x \mapsto C_i(X_i) \}`.
-   * 
+   *
    * \endverbatim
    */
   EVALUE(QUANT_DT_SPLIT),
@@ -2955,7 +2967,8 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *   (\forall Y x Z.\> F) = (\forall Y X_1 Z. F_1) \vee \cdots \vee (\forall Y X_n Z. F_n)
+   *   (\forall Y x Z.\> F) = (\forall Y X_1 Z. F_1) \vee \cdots \vee (\forall Y
+   * X_n Z. F_n)
    *
    * where :math:`x` is of a datatype type with constructors
    * :math:`C_1, \ldots, C_n`, where for each :math:`i = 1, \ldots, n`,
@@ -3116,7 +3129,7 @@ enum ENUM(ProofRewriteRule)
    * .. math::
    *
    *   (t = s) = false
-   * 
+   *
    * where :math:`t` and :math:`s` have subterms that occur in the same
    * position (beneath constructor applications) that are distinct.
    *
@@ -3172,7 +3185,8 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *   u_{c,i}(c(t_1, \ldots, t_i, \ldots, t_n), s) = c(t_1, \ldots, s, \ldots, t_n)
+   *   u_{c,i}(c(t_1, \ldots, t_i, \ldots, t_n), s) = c(t_1, \ldots, s, \ldots,
+   * t_n)
    *
    * or alternatively
    *
@@ -3191,7 +3205,8 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *   u_{c,i}(t, s) = ite(\mathit{is}_c(t), c(s_0(t), \ldots, s, \ldots s_n(t)), t)
+   *   u_{c,i}(t, s) = ite(\mathit{is}_c(t), c(s_0(t), \ldots, s, \ldots
+   * s_n(t)), t)
    *
    * where :math:`s_i` is the :math:`i^{th}` selector for constructor :math:`c`.
    *
@@ -3204,8 +3219,9 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *   \texttt{match}(t ((p_1 c_1) \ldots (p_n c_n))) = \texttt{ite}(F_1, r_1, \texttt{ite}( \ldots, r_n))
-   * 
+   *   \texttt{match}(t ((p_1 c_1) \ldots (p_n c_n))) = \texttt{ite}(F_1, r_1,
+   * \texttt{ite}( \ldots, r_n))
+   *
    * where for :math:`i=1, \ldots, n`, :math:`F_1` is a formula that holds iff
    * :math:`t` matches :math:`p_i` and :math:`r_i` is the result of a
    * substitution on :math:`c_i` based on this match.
@@ -3385,7 +3401,8 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *    bvand(a,\ c) = concat(bvand(a[i_0:j_0],\ c_0) ... bvand(a[i_n:j_n],\ c_n))
+   *    bvand(a,\ c) = concat(bvand(a[i_0:j_0],\ c_0) ...
+   * bvand(a[i_n:j_n],\ c_n))
    *
    * where c0,..., cn are maximally continuous substrings of 0 or 1 in the
    * constant c
@@ -3425,7 +3442,7 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *    (s = \mathit{str}.\text{++}(t_1, \ldots, t_n)) = 
+   *    (s = \mathit{str}.\text{++}(t_1, \ldots, t_n)) =
    *    (s = \mathit{str}.\text{++}(t_1, \ldots t_i)) \wedge
    *    t_{i+1} = \epsilon \wedge \ldots \wedge t_n = \epsilon
    *
@@ -3440,8 +3457,8 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *    (\mathit{str}.\text{++}(s_1, \ldots, s_n) = \mathit{str}.\text{++}(t_1, \ldots, t_m)) =
-   *    (r_1 = u_1 \wedge \ldots r_k = u_k)
+   *    (\mathit{str}.\text{++}(s_1, \ldots, s_n) = \mathit{str}.\text{++}(t_1,
+   * \ldots, t_m)) = (r_1 = u_1 \wedge \ldots r_k = u_k)
    *
    * where for each :math:`i = 1, \ldots, k`, we can show the length of
    * :math:`r_i` and :math:`u_i` are equal,
@@ -3461,7 +3478,8 @@ enum ENUM(ProofRewriteRule)
    *
    * where :math:`t_1` and :math:`t_2` are substrings of :math:`t`. This
    * rule is elaborated using
-   * :cpp:enumerator:`STR_OVERLAP_SPLIT_CTN <cvc5::ProofRewriteRule::STR_OVERLAP_SPLIT_CTN>`.
+   * :cpp:enumerator:`STR_OVERLAP_SPLIT_CTN
+   * <cvc5::ProofRewriteRule::STR_OVERLAP_SPLIT_CTN>`.
    *
    * \endverbatim
    */
@@ -3488,9 +3506,12 @@ enum ENUM(ProofRewriteRule)
    * where in each case we reason about removing portions of :math:`t`
    * that are irrelevant to the evaluation of the term. This rule
    * is elaborated  using
-   * :cpp:enumerator:`STR_OVERLAP_ENDPOINTS_CTN <cvc5::ProofRewriteRule::STR_OVERLAP_ENDPOINTS_CTN>`,
-   * :cpp:enumerator:`STR_OVERLAP_ENDPOINTS_INDEXOF <cvc5::ProofRewriteRule::STR_OVERLAP_ENDPOINTS_INDEXOF>` and
-   * :cpp:enumerator:`STR_OVERLAP_ENDPOINTS_REPLACE <cvc5::ProofRewriteRule::STR_OVERLAP_ENDPOINTS_REPLACE>`.
+   * :cpp:enumerator:`STR_OVERLAP_ENDPOINTS_CTN
+   * <cvc5::ProofRewriteRule::STR_OVERLAP_ENDPOINTS_CTN>`,
+   * :cpp:enumerator:`STR_OVERLAP_ENDPOINTS_INDEXOF
+   * <cvc5::ProofRewriteRule::STR_OVERLAP_ENDPOINTS_INDEXOF>` and
+   * :cpp:enumerator:`STR_OVERLAP_ENDPOINTS_REPLACE
+   * <cvc5::ProofRewriteRule::STR_OVERLAP_ENDPOINTS_REPLACE>`.
    *
    * \endverbatim
    */
@@ -3608,7 +3629,8 @@ enum ENUM(ProofRewriteRule)
   EVALUE(MACRO_STR_IN_RE_INCLUSION),
   /**
    * \verbatim embed:rst:leading-asterisk
-   * **Strings -- Macro regular expression intersection/union constant elimination**
+   * **Strings -- Macro regular expression intersection/union constant
+   * elimination**
    *
    * One of the following forms:
    *
@@ -3617,23 +3639,26 @@ enum ENUM(ProofRewriteRule)
    *   \mathit{re.union}(R) = \mathit{re.union}(R')
    *
    * where :math:`R` is a list of regular expressions containing :math:`R_i`
-   * and :math:`\mathit{str.to_re(c)}` where :math:`c` is a string in :math:`R_i`
-   * and :math:`R'` is the result of removing :math:`\mathit{str.to_re(c)}` from :math:`R`.
+   * and :math:`\mathit{str.to_re(c)}` where :math:`c` is a string in
+   * :math:`R_i` and :math:`R'` is the result of removing
+   * :math:`\mathit{str.to_re(c)}` from :math:`R`.
    *
    * .. math::
    *
    *   \mathit{re.inter}(R) = \mathit{re.inter}(R')
    *
    * where :math:`R` is a list of regular expressions containing :math:`R_i`
-   * and :math:`\mathit{str.to_re(c)}` where :math:`c` is a string in :math:`R_i`
-   * and :math:`R'` is the result of removing :math:`R_i` from :math:`R`.
+   * and :math:`\mathit{str.to_re(c)}` where :math:`c` is a string in
+   * :math:`R_i` and :math:`R'` is the result of removing :math:`R_i` from
+   * :math:`R`.
    *
    * .. math::
    *
    *   \mathit{re.inter}(R) = \mathit{re.none}
    *
    * where :math:`R` is a list of regular expressions containing :math:`R_i`
-   * and :math:`\mathit{str.to_re(c)}` where :math:`c` is a string not in :math:`R_i`.
+   * and :math:`\mathit{str.to_re(c)}` where :math:`c` is a string not in
+   * :math:`R_i`.
    *
    * \endverbatim
    */
@@ -3660,9 +3685,9 @@ enum ENUM(ProofRewriteRule)
    *
    *   str.indexof\_re(s,r,n) = m
    *
-   * where :math:`s` is a string values, :math:`n` is an integer value, :math:`r` is a
-   * ground regular expression and :math:`m` is the result of evaluating the left hand
-   * side.
+   * where :math:`s` is a string values, :math:`n` is an integer value,
+   * :math:`r` is a ground regular expression and :math:`m` is the result of
+   * evaluating the left hand side.
    *
    * \endverbatim
    */
@@ -3675,8 +3700,8 @@ enum ENUM(ProofRewriteRule)
    *
    *   str.replace\_re(s,r,t) = u
    *
-   * where :math:`s,t` are string values, :math:`r` is a ground regular expression
-   * and :math:`u` is the result of evaluating the left hand side.
+   * where :math:`s,t` are string values, :math:`r` is a ground regular
+   * expression and :math:`u` is the result of evaluating the left hand side.
    *
    * \endverbatim
    */
@@ -3689,8 +3714,8 @@ enum ENUM(ProofRewriteRule)
    *
    *   str.replace\_re\_all(s,r,t) = u
    *
-   * where :math:`s,t` are string values, :math:`r` is a ground regular expression
-   * and :math:`u` is the result of evaluating the left hand side.
+   * where :math:`s,t` are string values, :math:`r` is a ground regular
+   * expression and :math:`u` is the result of evaluating the left hand side.
    *
    * \endverbatim
    */
@@ -3724,7 +3749,8 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *   \mathit{re.union}(R) = \mathit{re.union}(\mathit{re}.\text{*}(\mathit{re.allchar}),\ R_0)
+   *   \mathit{re.union}(R) =
+   * \mathit{re.union}(\mathit{re}.\text{*}(\mathit{re.allchar}),\ R_0)
    *
    * where :math:`R` is a list of regular expressions containing `r_1`,
    * `re.comp(r_2)` and the list :math:`R_0`, where `r_1` is a superset of
@@ -3752,7 +3778,8 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *   \mathit{re.union}(r_1, re.comp(r_2)) = \mathit{re}.\text{*}(\mathit{re.allchar})
+   *   \mathit{re.union}(r_1, re.comp(r_2)) =
+   * \mathit{re}.\text{*}(\mathit{re.allchar})
    *
    * where :math:`r_1` is a superset of :math:`r_2`.
    *
@@ -3807,7 +3834,10 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *   \mathit{str.in\_re}(\mathit{str}.\text{++}(s_1, \ldots, s_n), \mathit{re}.\text{*}(R)) =\\ \mathit{str.in\_re}(s_1, \mathit{re}.\text{*}(R)) \wedge \ldots \wedge \mathit{str.in\_re}(s_n, \mathit{re}.\text{*}(R))
+   *   \mathit{str.in\_re}(\mathit{str}.\text{++}(s_1, \ldots, s_n),
+   * \mathit{re}.\text{*}(R)) =\\ \mathit{str.in\_re}(s_1,
+   * \mathit{re}.\text{*}(R)) \wedge \ldots \wedge \mathit{str.in\_re}(s_n,
+   * \mathit{re}.\text{*}(R))
    *
    * where all strings in :math:`R` have length one.
    *
@@ -3820,13 +3850,16 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *   \mathit{str.in\_re}(s, \mathit{re}.\text{++}(\mathit{re.allchar}, \ldots, \mathit{re.allchar})) = (\mathit{str.len}(s) = n)
+   *   \mathit{str.in\_re}(s, \mathit{re}.\text{++}(\mathit{re.allchar}, \ldots,
+   * \mathit{re.allchar})) = (\mathit{str.len}(s) = n)
    *
    * or alternatively:
    *
    * .. math::
    *
-   *   \mathit{str.in\_re}(s, \mathit{re}.\text{++}(\mathit{re.allchar}, \ldots, \mathit{re.allchar}, \mathit{re}.\text{*}(\mathit{re.allchar}))) = (\mathit{str.len}(s) \ge n)
+   *   \mathit{str.in\_re}(s, \mathit{re}.\text{++}(\mathit{re.allchar}, \ldots,
+   * \mathit{re.allchar}, \mathit{re}.\text{*}(\mathit{re.allchar}))) =
+   * (\mathit{str.len}(s) \ge n)
    *
    * \endverbatim
    */
@@ -3837,7 +3870,9 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *   \mathit{str.in\_re}(s, \mathit{re}.\text{*}(\mathit{re}.\text{++}(\mathit{re.allchar}, \ldots, \mathit{re.allchar}))) = (\mathit{str.len}(s) \ \% \ n = 0)
+   *   \mathit{str.in\_re}(s,
+   * \mathit{re}.\text{*}(\mathit{re}.\text{++}(\mathit{re.allchar}, \ldots,
+   * \mathit{re.allchar}))) = (\mathit{str.len}(s) \ \% \ n = 0)
    *
    * where :math:`n` is the number of :math:`\mathit{re.allchar}` arguments to
    * :math:`\mathit{re}.\text{++}`.
@@ -3867,8 +3902,8 @@ enum ENUM(ProofRewriteRule)
    *
    *   \mathit{f}(t_1, t_2) = t
    *
-   * where :math:`f` is one of :math:`\mathit{set.inter}, \mathit{set.minus}, \mathit{set.union}`,
-   * and :math:`t` is the result of evaluating :math:`f` on
+   * where :math:`f` is one of :math:`\mathit{set.inter}, \mathit{set.minus},
+   * \mathit{set.union}`, and :math:`t` is the result of evaluating :math:`f` on
    * :math:`t_1` and :math:`t_2`.
    *
    * Note we use this rule only when :math:`t_1` and :math:`t_2` are set values,
@@ -3883,7 +3918,9 @@ enum ENUM(ProofRewriteRule)
    *
    * .. math::
    *
-   *   \mathit{set.insert}(t_1, \ldots, t_n, S) = \texttt{set.union}(\texttt{sets.singleton}(t_1), \ldots, \texttt{sets.singleton}(t_n), S)
+   *   \mathit{set.insert}(t_1, \ldots, t_n, S) =
+   * \texttt{set.union}(\texttt{sets.singleton}(t_1), \ldots,
+   * \texttt{sets.singleton}(t_n), S)
    *
    * \endverbatim
    */
