@@ -509,6 +509,21 @@
   :conclusion (= (>= n 0) (>= m 0))
 )
 
+(include "../programs/Nfa.eo")
+
+(program $str_eval_str_in_re_2 ((r RegLan) (s String) (b Bool))
+  :signature (String RegLan Bool) Bool
+  (
+    (($str_eval_str_in_re_2 s r b)  
+        (eo::ite (eo::gt (eo::len s) 30)
+          ($str_eval_str_in_re_nfa s r)
+          b
+        )
+    )
+  )
+)
+
+
 ; rule: str-in-re-eval
 ; implements: ProofRewriteRule::STR_IN_RE_EVAL
 ; args:
@@ -518,7 +533,7 @@
 ; conclusion: The given equality.
 (declare-rule str-in-re-eval ((s String) (r RegLan) (b Bool))
   :args ((= (str.in_re s r) b))
-  :requires ((($str_eval_str_in_re s r) b))
+  :requires ((($str_eval_str_in_re_2 s r b) b))
   :conclusion (= (str.in_re s r) b)
 )
 
