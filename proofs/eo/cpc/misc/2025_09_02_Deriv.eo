@@ -1,0 +1,142 @@
+(include "../programs/Strings.eo")
+
+(program $nullable ((s1 String) (s2 String) (rr RegLan :list) (r1 RegLan) (r2 RegLan))
+  (RegLan) Bool
+  (
+    (($nullable @re.null)                   false)
+    (($nullable re.all)                     true)
+    (($nullable re.none)                    false)
+    (($nullable @re.empty)                  true)
+    (($nullable (re.comp r1))               (eo::not ($nullable r1)))
+    (($nullable (re.range s1 s2))           false)
+    (($nullable re.allchar)                 false)
+    (($nullable (str.to_re s1))             (eo::is_eq s1 ""))
+    (($nullable (re.* r1))                  true)
+    (($nullable (re.union r1 rr))           (eo::ite ($nullable r1) true ($nullable rr)))
+    (($nullable (re.inter r1 rr))           (eo::ite ($nullable r1) ($nullable rr) false))
+    (($nullable (re.++ r1 rr))              (eo::ite ($nullable r1) ($nullable rr) false))
+  )
+)
+
+
+(program $dedup_add_one_to_union2 ((r1 RegLan) (r2 RegLan) (rr RegLan :list) (rr2 RegLan :list))
+  (RegLan RegLan) RegLan
+  (
+    (($dedup_add_one_to_union2 (re.union r1 rr) r2)  (eo::ite (eo::is_eq r1 r2)
+                                                      (eo::cons re.union r1 rr)
+                                                      (eo::cons re.union r1 ($dedup_add_one_to_union2 rr r2))
+                                                    ))
+    (($dedup_add_one_to_union2 re.none re.none)      re.none)
+    (($dedup_add_one_to_union2 re.none r2)           (re.union r2))
+    (($dedup_add_one_to_union2 r1 re.none)           (re.union r1))
+  )
+)
+
+(program $dedup_add_one_to_union3 ((r1 RegLan) (r2 RegLan) (rr RegLan :list) (rr2 RegLan :list))
+  (RegLan RegLan) RegLan
+  (
+    (($dedup_add_one_to_union3 (re.union r1 rr) r2)  (eo::ite (eo::is_neg (eo::list_find re.union (re.union r1 rr) r2))
+                                                      (eo::cons re.union r2 (re.union r1 rr))
+                                                      (re.union r1 rr)
+                                                    ))
+    (($dedup_add_one_to_union3 re.none re.none)      re.none)
+    (($dedup_add_one_to_union3 re.none r2)           (re.union r2))
+    (($dedup_add_one_to_union3 r1 re.none)           (re.union r1))
+    (($dedup_add_one_to_union3 r1 r2)           (re.union r1 r2))
+  )
+)
+
+(program $dedup_union_rec2 ((r1 RegLan) (r2 RegLan) (rr1 RegLan :list) (r3 RegLan) (r4 RegLan) (rr2 RegLan :list))
+  (RegLan RegLan) RegLan
+  (
+     ;(($dedup_union_rec2 r1 (re.union (re.union r2 rr2) rr1))  ($dedup_union_rec2 ($dedup_union_rec2 r1 (re.union r2 rr2)) rr1))
+     (($dedup_union_rec2 r1 (re.union r2 rr1))                 ($dedup_union_rec2 ($dedup_add_one_to_union3 r1 r2) rr1))
+     (($dedup_union_rec2 r1 r2)                                ($dedup_add_one_to_union3 r1 r2))
+  )
+)
+
+(program $dedup_union_rec3 ((r1 RegLan) (r2 RegLan) (rr1 RegLan :list) (r3 RegLan) (r4 RegLan) (rr2 RegLan :list))
+  (RegLan RegLan) RegLan
+  (
+     (($dedup_union_rec3 r1 (re.union r2 rr1))                 (eo::list_setof re.union (eo::list_concat re.union r1 (re.union r2 rr1))))
+     (($dedup_union_rec3 r1 r2)                                ($dedup_add_one_to_union3 r1 r2))
+  )
+)
+
+(program $re_flatten2 ((r1 RegLan) (s1 String) (s2 String) (rr RegLan :list))
+  (RegLan) RegLan
+  (
+    (($re_flatten2 r1)                         ($dedup_union_rec2 re.none r1))
+  )
+)
+
+(program $re_flatten3 ((r1 RegLan) (s1 String) (s2 String) (rr RegLan :list) (r1 RegLan))
+  (RegLan) RegLan
+  (
+    (($re_flatten3 (re.union r1 rr))    ($dedup_union_rec2 rr r1))
+  )
+)
+
+(program $to_union ((r1 RegLan) (rr RegLan :list))
+  (RegLan) RegLan
+  (
+    (($to_union (re.union r1 rr))        (re.union r1 rr))
+    (($to_union re.none)                 re.none)
+    (($to_union r1)                      (re.union r1))
+  )
+)
+
+;;; Program to compute the derivative of a regex w.r.t. a character.
+(program $derivative
+  ((c String) (s String) (s1 String) (s2 String) (rr RegLan :list) (r1 RegLan))
+  :signature (String RegLan) RegLan
+  (
+    ;; Base cases for primitives
+    (($derivative c re.none) re.none)
+    (($derivative c @re.empty) re.none)
+    (($derivative c re.all) re.all)
+    (($derivative c re.allchar) @re.empty)
+
+    ;; Derivative of a literal string
+    (($derivative c (str.to_re s))
+      (eo::ite (eo::is_eq (eo::len s) 0)
+        re.none
+        (eo::ite (eo::is_eq (eo::extract s 0 0) c)
+          (str.to_re (eo::extract s 1 (eo::add -1 (eo::len s))))
+          re.none)))
+
+    ;; Derivative of a character range
+    (($derivative c (re.range s1 s2))
+      (eo::ite (eo::and ($compare_geq (eo::to_z c) (eo::to_z s1)) ($compare_geq (eo::to_z s2) (eo::to_z c)))
+        @re.empty
+        re.none))
+
+    ;; Rules for compound expressions
+    ;(($derivative c (re.union r1 rr)) ($re_flatten3 (re.union ($derivative c r1) ($derivative c rr))))
+    (($derivative c (re.union r1 rr)) ($dedup_union_rec3 ($derivative c rr) ($derivative c r1)))
+    ;(($derivative c (re.union r1 rr)) (eo::list_setof re.union (eo::list_concat re.union ($to_union ($derivative c r1)) ($derivative c rr))))
+    (($derivative c (re.union r1 rr)) (eo::list_setof re.union (eo::list_concat re.union ($to_union ($derivative c r1)) ($derivative c rr))))
+    (($derivative c (re.inter r1 rr)) (re.inter ($derivative c r1) ($derivative c rr)))
+    (($derivative c (re.comp r1)) (re.comp ($derivative c r1)))
+    (($derivative c (re.* r1)) (re.++ ($derivative c r1) (re.* r1)))
+
+    ;; Concatenation rule depends on nullability of the first part
+    (($derivative c (re.++ r1 rr))
+      (eo::ite ($nullable r1)
+        ;($re_flatten3 (re.union (re.++ ($derivative c r1) rr) ($derivative c rr)))
+        ($dedup_union_rec2 ($derivative c rr) (re.++ ($derivative c r1) rr))
+        (re.++ ($derivative c r1) rr)))
+  )
+)
+
+(program $str_eval_str_in_re_deriv ((s String) (r RegLan))
+  :signature (String RegLan) Bool
+  (
+    (($str_eval_str_in_re_deriv "" r)
+      ($nullable r))
+    (($str_eval_str_in_re_deriv s r)
+      ($str_eval_str_in_re_deriv
+        (eo::extract s 1 (eo::add -1 (eo::len s)))  ; The rest of the string
+        ($derivative (eo::extract s 0 0) r)))       ; The new, derived regex
+  )
+)
