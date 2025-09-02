@@ -187,7 +187,7 @@
 (program $str_eval_str_in_re_rec ((s String) (s1 String) (s2 String) (n Int) (r1 RegLan) (rr RegLan :list) (r2 RegLan) (sr String))
   :signature (String Int RegLan RegLan) Bool
   (
-  (($str_eval_str_in_re_rec s 0 (re.++ r1 rr) @re.null)     ($str_eval_str_in_re_rec s 0 r1 rr))
+  (($str_eval_str_in_re_rec s 0 (re.++ r1 rr) @re.null)     ($str_eval_str_in_re_rec s (eo::len s) r1 rr))
   (($str_eval_str_in_re_rec s 0 (re.inter r1 rr) @re.null)  (eo::ite ($str_eval_str_in_re_rec s 0 r1 @re.null)
                                                               ($str_eval_str_in_re_rec s 0 rr @re.null)
                                                               false))
@@ -197,7 +197,7 @@
   (($str_eval_str_in_re_rec s 0 (re.* r1) @re.null)         (eo::ite (eo::eq s "")
                                                               true
                                                               ; to make progress, first component must be non-empty
-                                                              ($str_eval_str_in_re_rec s 1 r1 (re.* r1))))
+                                                              ($str_eval_str_in_re_rec s (eo::add (eo::len s) -1) (re.* r1) r1)))
   (($str_eval_str_in_re_rec s 0 (str.to_re sr) @re.null)    (eo::eq s sr))
   (($str_eval_str_in_re_rec s 0 (re.range s1 s2) @re.null)  (eo::define ((cs (eo::to_z s)))
                                                             (eo::requires ($str_is_char_range s1 s2) true
@@ -217,8 +217,8 @@
                                                                          true false)
                                                                        false)))
                                                             (eo::ite res true
-                                                            (eo::ite (eo::eq n ls) false
-                                                              ($str_eval_str_in_re_rec s (eo::add n 1) r1 r2))))))))
+                                                            (eo::ite (eo::eq n 0) false
+                                                              ($str_eval_str_in_re_rec s (eo::add n -1) r1 r2))))))))
   )
 )
 
@@ -1896,3 +1896,616 @@
       s
       ($str_eval_replace_all_rec s t u (eo::find s t) (eo::len t)))
     (str.replace_all s t u)))
+
+;;
+;;; AWS Updates: Brzozowski derivatives
+;;;
+;;; Copyright 2024-2025, Amazon Web Services and others. All rights reserved.
+;;;
+
+; Defines the regular expression obtained after consuming a given string from a regular expression.
+; This can be used to properly handle the case when we cannot evaluate
+(declare-const re.consume (-> String RegLan RegLan))                ; When we deal with `a^{-1}(regexX)`, where `regexX` is a variable, we return (re.consume a X).
+                                                                    ; This helps us cleanly identify the cases where we could not compute the derivative
+(declare-const unknown (-> Bool))                                   ; We use this constant to represent that we do not know the result.
+(declare-const re.reverse (-> RegLan RegLan))
+(declare-const str.reverse (-> String String))
+
+;;;;;;;;;;;; Helper Functions for the Brzozowski Derivative ;;;;;;;;;;;;;;
+
+; program to compute the true length of a string.
+; It returns `-1` if the length cannot be computed due to presence of variable.
+; args:
+; - s String: A string
+; return: >
+;   n Int: Returns a positive n equal to the length of the string if the string is constant
+;   -1   : If the string contains any variable and its length cannot be computed
+(program $str_true_length ((s1 String) (s2 String) (ss String :list) (t String))
+  (String) Int
+  (
+    (($str_true_length "")                  0)
+    (($str_true_length (str.++ s1 ss))      (eo::define ((len_s1   ($str_true_length s1)) (len_ss ($str_true_length ss)))
+                                              (eo::ite (eo::or (eo::is_neg len_s1) (eo::is_neg len_ss))
+                                                        -1
+                                                        (eo::add len_s1 len_ss)
+                                              )
+                                            )
+    )
+    (($str_true_length t)                   (eo::match ((v1 Int) (t1 String))
+                                              (eo::len t)                           ; try to compute the length of t
+                                              (
+                                                ((eo::len t1)          -1)          ; if we could not compute the length, then there was a variable in t, so we return -1
+                                                (v1                   v1)           ; we return the actual length of this word.
+                                              )
+                                            )
+    )
+  )
+)
+
+; Following is a variant of $str_flatten that flattens the words deeply.
+; program: $str_flatten_deep
+; args:
+; - t (Seq U): The string term.
+; return: >
+;   The result of "flattening" all children of t. For example, given
+;   (str.++ "AB" x "CD" (str.++ "EF")), this returns the term
+;   (str.++ "A" (str.++ "B" (str.++ x (str.++ "C" (str.++ "D" "" (str.++ "E" (str.++ "F"))))))).
+(program $str_flatten_deep ((U Type) (t (Seq U)) (tail (Seq U) :list) (tail2 (Seq U) :list) (rev Bool))
+  (Bool (Seq U)) (Seq U)
+  (
+    ; required for sequences
+    (($str_flatten_deep rev (str.++ (str.++ t tail2) tail))
+        (eo::ite rev
+        ($str_concat ($str_flatten_deep true tail) ($str_flatten_deep true (str.++ t tail2)))
+        ($str_concat ($str_flatten_deep false (str.++ t tail2)) ($str_flatten_deep false tail))
+        )
+    )
+    (($str_flatten_deep rev (str.++ t tail)) (eo::define ((t_flattened ($str_flatten_deep rev t)) (tail_flattened ($str_flatten_deep rev tail)))
+                                                (eo::ite rev
+                                                  ($str_concat tail_flattened t_flattened)
+                                                  ($str_concat t_flattened    tail_flattened)
+                                                )
+                                              )
+    )
+    (($str_flatten_deep true (str.reverse t)) (str.++ t ""))
+    (($str_flatten_deep rev t)                (eo::define ((t_len ($str_true_length t)))
+                                                (eo::ite (eo::is_neg t_len)
+                                                  (str.++ (eo::ite rev (str.reverse t) t) "")
+                                                  (eo::ite (eo::is_eq t_len 0)
+                                                    t
+                                                    (eo::ite (eo::is_eq t_len 1)
+                                                      (str.++ t "")
+                                                      ($str_flatten_deep rev ($str_flatten_word t))
+                                                    )
+                                                  )
+                                                )
+                                              )
+    )
+  )
+)
+
+; While taking derivative, we don't want the flattened strings to contain "" as argument to (str.++ )
+; This function basically removes all the empty strings concatenation in a flattened string
+; args:
+; - s String: A flattened string computed via str_flatten_deep.
+; return: >
+; -   An equivalent string without empty string in its concatenation
+(program $remove_empty_string_concat ((s1 String) (ss String :list))
+  (String) String
+  (
+     (($remove_empty_string_concat (str.++ s1 ss))      (eo::define ((fixeds1 ($remove_empty_string_concat s1)))
+                                                          (eo::ite (eo::not (eo::is_eq fixeds1 ""))
+                                                                (eo::cons str.++ fixeds1 ($remove_empty_string_concat ss))
+                                                                ($remove_empty_string_concat ss)
+                                                          )
+                                                        )
+     )
+     (($remove_empty_string_concat s1)                  s1)
+  )
+)
+
+; function to normalize a string/word
+; args:
+; - s String: A string
+; return: >
+;   Flattens a string/constant word, and remove empty string concatentations.
+(define $normalize_string ((rev Bool) (s1 String))
+  ($remove_empty_string_concat ($str_flatten_deep rev ($str_nary_intro s1)))
+)
+
+; program returns whether two regular expressions are syntactically equal
+; args:
+; - r1 RegLan: A regex
+; - r2 RegLan: Another regex
+; return: >
+; -  true:  if r1 matches r2 syntactically
+; -  false: otherwise
+(program $re_is_eq ((r1 RegLan) (r2 RegLan) (rr RegLan :list))
+  (RegLan RegLan) Bool
+  (
+    (($re_is_eq r1 r1)                                      true)
+    (($re_is_eq r1 r2)                                      false)
+  )
+)
+
+; program to deeply flatten strings in the regular expression. This ensures that no string in regex has "" as argument to str.++ unless it is emtpy string
+; It also reverses the regular expression if the bool rev is true
+; args:
+; - r1 RegLan: A regex
+; return: >
+; -   An equivalent regular expression where all the strings in (str.to_re _) are normalized (deeply flattened and "" are ignored in concatenations).
+(program $re_flatten_str_deep ((r1 RegLan) (s1 String) (s2 String) (rr RegLan :list) (rev Bool))
+  (Bool RegLan) RegLan
+  (
+    (($re_flatten_str_deep rev (re.comp r1))                (re.comp ($re_flatten_str_deep rev r1)))
+    (($re_flatten_str_deep rev (re.range s1 s2))            (re.range s1 s2)) ; HS CAUTION: We don't normalize re.range arguments as they are usually unit length words like "a" "b"...
+    (($re_flatten_str_deep rev (str.to_re s1))              (str.to_re  ($normalize_string rev s1)))
+    (($re_flatten_str_deep rev (re.* r1))                   (re.* ($re_flatten_str_deep rev r1)))
+    (($re_flatten_str_deep rev (re.inter r1 rr))            (eo::cons re.inter ($re_flatten_str_deep rev r1) ($re_flatten_str_deep rev rr)))
+    (($re_flatten_str_deep rev (re.union r1 rr))            (eo::cons re.union ($re_flatten_str_deep rev r1) ($re_flatten_str_deep rev rr)))
+    (($re_flatten_str_deep rev (re.++ r1 rr))               (eo::ite rev
+                                                              (eo::list_concat re.++ ($re_nary_intro ($re_flatten_str_deep rev rr)) ($re_nary_intro ($re_flatten_str_deep rev r1)))
+                                                              (eo::cons re.++ ($re_flatten_str_deep rev r1) ($re_flatten_str_deep rev rr))
+                                                            )
+    )
+    (($re_flatten_str_deep rev (re.reverse r1))             (eo::ite rev
+                                                              ($re_flatten_str_deep false r1)
+                                                              (re.reverse ($re_flatten_str_deep false r1))
+                                                            )
+    )
+    (($re_flatten_str_deep rev re.none)                     re.none)
+    (($re_flatten_str_deep rev re.allchar)                  re.allchar)
+    (($re_flatten_str_deep rev @re.empty)                   @re.empty)
+    (($re_flatten_str_deep rev @re.null)                    @re.null)
+    (($re_flatten_str_deep rev re.all)                      re.all)
+    (($re_flatten_str_deep rev r1)                          (re.reverse r1))
+  )
+)
+
+; program to undo the deeply flattening strings in the regular expression. This method is dual of $re_flatten_str_deep.
+; args:
+; - r1 RegLan: A regex
+; return: >
+; -   An equivalent regular expression where all the strings in (str.to_re _) are `denormalized`, i.e., converted to flat_form.
+(program $undo_re_flatten_str_deep ((r1 RegLan) (s1 String) (s2 String) (rr RegLan :list) (rev Bool))
+  (Bool RegLan) RegLan
+  (
+    (($undo_re_flatten_str_deep rev (re.comp r1))                (re.comp ($undo_re_flatten_str_deep rev r1)))
+    (($undo_re_flatten_str_deep rev (re.range s1 s2))            (re.range s1 s2)) ; HS CAUTION: We don't denormalize re.range arguments as they are usually unit length words like "a" "b"...
+    (($undo_re_flatten_str_deep rev (str.to_re s1))              (str.to_re  ($str_from_flat_form ($normalize_string rev s1) false)))
+    (($undo_re_flatten_str_deep rev (re.* r1))                   (re.* ($undo_re_flatten_str_deep rev r1)))
+    (($undo_re_flatten_str_deep rev (re.inter r1 rr))            (eo::cons re.inter ($undo_re_flatten_str_deep rev r1) ($undo_re_flatten_str_deep rev rr)))
+    (($undo_re_flatten_str_deep rev (re.union r1 rr))            (eo::cons re.union ($undo_re_flatten_str_deep rev r1) ($undo_re_flatten_str_deep rev rr)))
+    (($undo_re_flatten_str_deep rev (re.++ r1 rr))               (eo::ite rev
+                                                              (eo::list_concat re.++ ($re_nary_intro ($undo_re_flatten_str_deep rev rr)) ($re_nary_intro ($undo_re_flatten_str_deep rev r1)))
+                                                              (eo::cons re.++ ($undo_re_flatten_str_deep rev r1) ($undo_re_flatten_str_deep rev rr))
+                                                            )
+    )
+    (($undo_re_flatten_str_deep rev (re.reverse r1))        (eo::ite rev
+                                                              ($undo_re_flatten_str_deep false r1)
+                                                              (re.reverse ($undo_re_flatten_str_deep false r1))
+                                                            )
+    )
+    (($undo_re_flatten_str_deep rev re.none)                     re.none)
+    (($undo_re_flatten_str_deep rev re.allchar)                  re.allchar)
+    (($undo_re_flatten_str_deep rev @re.empty)                   @re.empty)
+    (($undo_re_flatten_str_deep rev @re.null)                    @re.null)
+    (($undo_re_flatten_str_deep rev re.all)                      re.all)
+    (($undo_re_flatten_str_deep rev r1)                          (re.reverse r1))
+  )
+)
+
+
+;;;;;;;;;;;;;; The following few functions help us removing redundant elements in a union. We do not change the order of the element while dropping the union
+;;;;;;;;;;;;;;
+
+
+; program: $re_nary_elim_union -- Modification of $re_nary_elim
+; args:
+; - t RegLan: The regular expresion.
+; return: >
+;   Regular expression nary-elimination, which ensures that the input t is not a
+;   singleton re.union application. In particular, if t is of the form
+;   (re.union r1 @re.none), we return r1.
+(program $re_nary_elim_union ((t RegLan) (ss RegLan :list))
+    (RegLan) RegLan
+    (
+        (($re_nary_elim_union (re.union t ss)) (eo::ite (eo::is_eq ss re.none) t (re.union t ss)))
+        (($re_nary_elim_union t)            t)
+    )
+)
+
+
+; program to add a single regular expression to a union while ignoring duplicates.
+; The first argument is the one without duplicates and must be a re.union (with re.none at the end) or re.none
+; args:
+; - r1 RegLan: A re.union or re.none regex without duplicates as children of re.union
+; - r2 RegLan: A regex that is not a re.union.
+; return: >
+; - An expression equivalent to (re.union r1 r2) without any duplicates in the expression returned.
+(program $dedup_add_one_to_union ((r1 RegLan) (r2 RegLan) (rr RegLan :list) (rr2 RegLan :list))
+  (RegLan RegLan) RegLan
+  (
+    (($dedup_add_one_to_union (re.union r1 rr) r2)  (eo::ite ($re_is_eq r1 r2)
+                                                      (eo::cons re.union r1 rr)
+                                                      (eo::cons re.union r1 ($dedup_add_one_to_union rr r2))
+                                                    ))
+    (($dedup_add_one_to_union re.none re.none)      re.none)
+    (($dedup_add_one_to_union re.none r2)           (re.union r2))
+    (($dedup_add_one_to_union r1 re.none)           (re.union r1))
+  )
+)
+
+; Idea:
+;   program to remove duplicates from the top level re.union
+;   (top-level refers to the fact that we don't go inside re.inter, for example, and flatten its argument,
+;   we only look at re.union that we can "see" directly).
+;   The first argument is the union from which we have already removed the duplicates
+;   We keep adding new elements from the second RegLan to first
+;   The first argument is the one without duplicates and must be a re.union (with re.none at the end) or re.none
+; args:
+; - r1 RegLan: A regex without any duplicates in the top level re.union
+; - r2 RegLan: A regex
+; return: >
+; - An expression of the form (re.union c1 c2 ... cn) that is equivalent to (re.union r1 r2) without any duplicates
+;   among the children c1... cn, where none of c_i is a re.union (i.e., returned expression is flattened)
+(program $dedup_union_rec ((r1 RegLan) (r2 RegLan) (rr1 RegLan :list) (r3 RegLan) (r4 RegLan) (rr2 RegLan :list))
+  (RegLan RegLan) RegLan
+  (
+     (($dedup_union_rec r1 (re.union (re.union r2 rr2) rr1))  ($dedup_union_rec ($dedup_union_rec r1 (re.union r2 rr2)) rr1))
+     (($dedup_union_rec r1 (re.union r2 rr1))                 ($dedup_union_rec ($dedup_add_one_to_union r1 r2) rr1))
+     (($dedup_union_rec r1 r2)                                ($dedup_add_one_to_union r1 r2))
+  )
+)
+
+; program to flatten top-level regular expressions union. It just calls the $dedup_union_rec with proper arguments
+(program $re_flatten ((r1 RegLan) (s1 String) (s2 String) (rr RegLan :list))
+  (RegLan) RegLan
+  (
+    (($re_flatten r1)                         ($re_nary_elim_union ($dedup_union_rec re.none r1)))
+  )
+)
+
+
+;;;;;;;;;;;;;; The following few functions help us simplify a re.++ expression by flattening it and
+;;;;;;;;;;;;;; simplifying it to re.none if one of the child is re.none
+;;;;;;;;;;;;;;
+
+; program to flatten the top-level re.++ (again, top-level means we do not go inside re.inter, re.comp... etc).
+; args:
+; - r1 RegLan: A regex
+; return: >
+; - An expression of the form (re.++ c1 c2 ... cn) that is equivalent to r1 such that no c_i is of kind re.++,
+;   or str.to_re "" (empty string).
+(program $flatten_top_level_concat ((r1 RegLan) (r2 RegLan) (rr1 RegLan :list) (r3 RegLan) (r4 RegLan) (rr2 RegLan :list))
+  (RegLan) RegLan
+  (
+     (($flatten_top_level_concat (re.++ (re.++ r2 (re.* r3) rr1))) (eo::cons re.++ (re.++ r2 (re.* r3)) ($flatten_top_level_concat rr1)))
+     (($flatten_top_level_concat (re.++ (re.++ r2 rr2) rr1))  ($flatten_top_level_concat (eo::list_concat re.++ ($flatten_top_level_concat (re.++ r2 rr2)) rr1)))
+     (($flatten_top_level_concat (re.++ r1 rr1))       (eo::ite (eo::is_eq r1 @re.empty)
+                                                                  ($flatten_top_level_concat rr1)
+                                                                  (eo::cons re.++ r1 ($flatten_top_level_concat rr1))
+                                                        )
+     )
+     (($flatten_top_level_concat r2)                    (eo::ite (eo::is_eq r2 @re.empty)
+                                                          @re.empty
+                                                          (re.++ r2)
+                                                        )
+     )
+  )
+)
+
+; program to find if there is a re.none in a concatenation. If there is, then the whole expression
+; is equivalent to re.none.
+(program $concat_has_re_none_then_none ((r1 RegLan) (r2 RegLan) (rr RegLan :list) (r3 RegLan))
+(RegLan) RegLan
+  (
+    (($concat_has_re_none_then_none  (re.++ r1 rr))            (eo::ite (eo::is_eq r1 re.none)
+                                                                re.none
+                                                                (eo::define ((rr_simp ($concat_has_re_none_then_none rr)))
+                                                                  (eo::ite (eo::is_eq rr_simp re.none)
+                                                                    re.none
+                                                                    (eo::cons re.++ r1 rr_simp)
+                                                                  )
+                                                                )
+                                                              )
+    )
+    (($concat_has_re_none_then_none r1)                     r1)
+  )
+)
+
+
+; It flattens the re.++ and then converts whole expression to re.none if one of the concatenation child is re.none.
+(define $simplify_regex_concat ((r1 RegLan))
+  ($concat_has_re_none_then_none ($re_nary_elim ($flatten_top_level_concat r1)))
+)
+
+;;;;;;;;;;;;;;;;;;;; Main functions for Brzozowski Derivative - START ;;;;;;;;;;;;;;;;;
+
+; program: $str_eval_epsilon_in_re_rec
+; args:
+; - r RegLan
+; returns: >
+; -   Bool: Returns true or false if it can evaluate whether "" is in the language of given regular expression.
+; -   `unkonwn`: Returns the constant `unknown` if it cannot be evaluated whether "" is the language of regex due
+;      to the presence of some variable in the regex.
+(program $str_eval_epsilon_in_re_rec ((s1 String) (s2 String) (rr RegLan :list) (r1 RegLan) (r2 RegLan))
+  (RegLan) Bool
+  (
+    (($str_eval_epsilon_in_re_rec @re.null)                   false)
+    (($str_eval_epsilon_in_re_rec re.all)                     true)
+    (($str_eval_epsilon_in_re_rec re.none)                    false)
+    (($str_eval_epsilon_in_re_rec @re.empty)                   true)
+    (($str_eval_epsilon_in_re_rec (re.comp r1))               (eo::not ($str_eval_epsilon_in_re_rec r1)))
+    (($str_eval_epsilon_in_re_rec (re.range s1 s2))           (eo::requires ($str_is_char_range s1 s2) true  ; we check that s1 s2 are unit length as sanity test, but the result is always false regardless
+                                                                  false))
+    (($str_eval_epsilon_in_re_rec re.allchar)                 false)
+    (($str_eval_epsilon_in_re_rec (str.to_re s1))             (eo::ite (eo::is_neg ($str_true_length s1))
+                                                                unknown     ; s1 has a variable in it, so we cannot decide this
+                                                                (eo::is_eq s1 ""))
+                                                              )
+    (($str_eval_epsilon_in_re_rec (re.* r1))                  true)
+    (($str_eval_epsilon_in_re_rec (re.union r1 rr))           (eo::ite ($str_eval_epsilon_in_re_rec r1) true ($str_eval_epsilon_in_re_rec rr)))
+    (($str_eval_epsilon_in_re_rec (re.inter r1 rr))           (eo::ite ($str_eval_epsilon_in_re_rec r1) ($str_eval_epsilon_in_re_rec rr) false))
+    (($str_eval_epsilon_in_re_rec (re.++ r1 rr))              (eo::ite ($str_eval_epsilon_in_re_rec r1) ($str_eval_epsilon_in_re_rec rr) false))
+    (($str_eval_epsilon_in_re_rec (re.reverse r1))            ($str_eval_epsilon_in_re_rec r1))
+    (($str_eval_epsilon_in_re_rec r1)                         unknown) ; in every other case, we cannot decide
+  )
+)
+
+;;;;;;;;;;;; The following two functions are important for computing the derivative of concatenation more concisely.
+;;;;;;;;;;;; In particular, given r1.r2.r3.r4.r5 where  `"" \in r1.r2`, but `"" \not\in r3`, when we compute a^{-1}(r1.r2.r3.r4.r5)
+;;;;;;;;;;;; we will like to return `((a^{-1}r1)r2r3 \cup (a^{-1}r2)r3 \cup a^{-1}r3)r4r5` and NOT
+;;;;;;;;;;;; ((a^{-1}r1)r2r3r4r5 \cup (a^{-1}r2)r3r4r5 \cup a^{-1}r3r4r5). This is same as the optimization we do in cvc5 implementation.
+;;;;;;;;;;;; Note that both of these expressions are equivalent, the former is just more compact, and it improved cvc5's performance by not
+;;;;;;;;;;;; blowing up the size of expression unnecessarily.
+
+
+; Given r1.r2.r3.r4.r5, e.g., output r1.r2.r3 if  \epsilon \in r1.r2, but \epsilon \not\in r3.
+(program $prefix_of_regex_until_no_epsilon ((c1 String) (s1 String) (s2 String) (ss String :list) (rr RegLan :list) (r1 RegLan) (r2 RegLan))
+  (RegLan) RegLan
+  (
+    (($prefix_of_regex_until_no_epsilon (re.++ @re.empty rr))      ($prefix_of_regex_until_no_epsilon rr))
+    (($prefix_of_regex_until_no_epsilon (re.++ r1 @re.empty))      r1)
+    (($prefix_of_regex_until_no_epsilon (re.++ r1 rr))
+                                                            (eo::match ((b Bool))
+                                                                    ($str_eval_epsilon_in_re_rec r1)
+                                                                    (
+                                                                      (true (re.++ r1 ($prefix_of_regex_until_no_epsilon rr)))
+                                                                      (false r1)
+                                                                    )
+                                                            )
+    )
+    (($prefix_of_regex_until_no_epsilon r1)                   r1)
+  )
+)
+
+; Given r1.r2.r3.r4.r5, e.g., output r4.r5 if \epsilon \in r1.r2, but \epsilon \not\in r3.
+(program $suffix_of_regex_until_no_epsilon ((c1 String) (s1 String) (s2 String) (ss String :list) (rr RegLan :list) (r1 RegLan) (r2 RegLan))
+  (RegLan) RegLan
+  (
+    (($suffix_of_regex_until_no_epsilon (re.++ r1 rr))      (eo::match ((b Bool))
+                                                                  ($str_eval_epsilon_in_re_rec r1)
+                                                                    (
+                                                                      (true ($suffix_of_regex_until_no_epsilon rr))
+                                                                      (false rr)
+                                                                    )
+                                                              )
+    )
+    (($suffix_of_regex_until_no_epsilon r1)                   @re.empty)
+  )
+)
+
+;;;;;;;;;;;;;;;;;;;;;
+
+; Takes a string c1, and regular expression r1, and returns s1^{-1}r1
+; We assume that c1 has length 1, and the input regular expression r is normalized,
+; i.e., every (str.to_re s) appearing in r has s in deeply flattened form, and the is empty if and only if it is of the form ""
+; this property allows us to safely retrieve the first non-empty character and the remaining string to process
+(program $str_eval_inverse_char_re_rec ((c1 String) (s1 String) (s2 String) (ss String :list) (rr RegLan :list) (r1 RegLan) (r2 RegLan))
+  (String RegLan) RegLan
+  (
+    (($str_eval_inverse_char_re_rec c1 (str.to_re (str.++ s1 ss)))  ; we have to check that length of s1 is 1 to ensure it is not a variable
+                                                                    (eo::ite (eo::and (eo::is_eq ($str_true_length s1) 1) (eo::is_eq ($str_true_length c1) 1))
+                                                                      (eo::ite (eo::is_eq c1 s1)
+                                                                        (str.to_re ss)
+                                                                        re.none
+                                                                      )
+                                                                      ; if s1 is not a concrete string, we will try to check equality syntactically
+                                                                      (eo::ite (eo::is_eq c1 s1)
+                                                                        (str.to_re ($str_from_flat_form ss false))
+                                                                        (re.consume c1 (str.to_re (str.++ s1 ss))) ; we failed to compute the derivative
+                                                                      )
+                                                                    )
+    )
+    (($str_eval_inverse_char_re_rec c1 @re.empty)                   (eo::ite (eo::is_eq ($str_true_length c1) 1)
+                                                                      re.none ; c1 is concrete character then it is re.none
+                                                                      (re.consume c1 @re.empty)
+                                                                    )
+    )
+    (($str_eval_inverse_char_re_rec c1 re.none)                     re.none)
+    (($str_eval_inverse_char_re_rec c1 re.all)                      re.all)
+    (($str_eval_inverse_char_re_rec c1 (re.comp r1))                (re.comp ($str_eval_inverse_char_re_rec c1 r1)))
+    (($str_eval_inverse_char_re_rec c1 (re.range s1 s2))            (eo::ite (eo::is_str c1)
+                                                                      (eo::define ((cs (eo::to_z c1)))
+                                                                      (eo::requires ($str_is_char_range s1 s2) true
+                                                                        (eo::ite (eo::and ($compare_geq cs (eo::to_z s1))
+                                                                                    ($compare_geq (eo::to_z s2) cs))
+                                                                            @re.empty
+                                                                            re.none))
+
+                                                                      )
+                                                                      (re.consume c1 (re.range s1 s2))   ; we fail if c1 is not concrete
+                                                                    )
+    )
+    (($str_eval_inverse_char_re_rec c1 re.allchar)             @re.empty)
+    (($str_eval_inverse_char_re_rec c1 (re.* r1))              ($simplify_regex_concat (re.++ ($str_eval_inverse_char_re_rec c1 r1) (re.* r1))))
+    (($str_eval_inverse_char_re_rec c1 (re.++ r1 (re.* r2)))   (eo::match ((b Bool))
+                                                                  ($str_eval_epsilon_in_re_rec r1)
+                                                                  (
+                                                                    (true ($simplify_regex_concat (re.++
+                                                                            ($re_flatten
+                                                                              (re.union
+                                                                                ($str_eval_inverse_char_re_rec c1 r1)
+                                                                                ($str_eval_inverse_char_re_rec c1 r2)
+                                                                            ))
+                                                                            (re.* r2)
+                                                                          ))
+                                                                    )
+                                                                    (false ($simplify_regex_concat (re.++ ($str_eval_inverse_char_re_rec c1 r1) (re.* r2))))
+                                                                    (b (re.consume c1 (re.++ r1 (re.* r2))))  ; checking if epsilon in r1 failed. So we failed
+                                                                  )
+                                                                )
+    )
+     (($str_eval_inverse_char_re_rec c1 (re.union r1 rr))       ($re_flatten (re.union ($str_eval_inverse_char_re_rec c1 r1) ($str_eval_inverse_char_re_rec c1 rr))))
+     (($str_eval_inverse_char_re_rec c1 (re.inter r1 rr))       (re.inter ($str_eval_inverse_char_re_rec c1 r1) ($str_eval_inverse_char_re_rec c1 rr)))
+     (($str_eval_inverse_char_re_rec c1 (re.++ r1 rr))          (eo::define (
+                                                                              (prefix_to_handle ($prefix_of_regex_until_no_epsilon rr))
+                                                                              (suffix_to_handle ($suffix_of_regex_until_no_epsilon rr))
+                                                                            )
+                                                                  (eo::match ((b Bool))
+                                                                    ($str_eval_epsilon_in_re_rec r1)
+                                                                     (
+                                                                      (true ($simplify_regex_concat
+                                                                              (re.++
+                                                                                ($re_flatten
+                                                                                  (re.union
+                                                                                    ($simplify_regex_concat (re.++ ($str_eval_inverse_char_re_rec c1 r1) prefix_to_handle))
+                                                                                    ($str_eval_inverse_char_re_rec c1 prefix_to_handle)
+                                                                                  )
+                                                                                )
+                                                                                suffix_to_handle
+                                                                              )
+                                                                            )
+                                                                      )
+                                                                      (false
+                                                                        ($simplify_regex_concat (re.++ ($str_eval_inverse_char_re_rec c1 r1) rr))
+                                                                      )
+                                                                      (b (re.consume c1 (re.++ r1 rr)))
+                                                                     )
+                                                                ))
+     )
+      (($str_eval_inverse_char_re_rec c1 r1)                    (re.consume c1 r1))       ; None of the rule work, so we cannot handle it.
+  )
+)
+
+; A function that can check if we have re.consume at any nested level in the program.
+; This will help us detect if the (str.str_eval_inverse_str_re_rec) failed.
+; The program goes through each child of regular expressions and checks if there is any re.consume type of child.
+; If there is, then it returns true, otherwise false.
+(program $has_re_consume ((r RegLan) (r1 RegLan) (r2 RegLan) (rr RegLan :list) (s1 String) (s2 String))
+  (RegLan) Bool
+  (
+    (($has_re_consume (re.consume s1 r1)) true) ; Found re.consume
+    (($has_re_consume (re.comp r1))             ; Check inside re.comp
+      ($has_re_consume r1)
+    )
+    (($has_re_consume (re.range s1 s2)) false)  ; re.range cannot contain re.consume
+    (($has_re_consume re.allchar) false)        ; re.allchar cannot contain re.consume
+    (($has_re_consume (re.* r1))                ; Check inside re.*
+      ($has_re_consume r1)
+    )
+    (($has_re_consume (re.++ r1 rr))            ; Check inside re.++
+      (eo::ite (eo::is_eq ($has_re_consume r1) true) true ($has_re_consume rr))
+    )
+    (($has_re_consume (re.union r1 rr))         ; Check inside re.union
+      (eo::ite (eo::is_eq ($has_re_consume r1) true) true ($has_re_consume rr))
+    )
+    (($has_re_consume (re.inter r1 rr))         ; Check inside re.inter
+      (eo::ite (eo::is_eq ($has_re_consume r1) true) true ($has_re_consume rr))
+    )
+    ; For unhandled cases, assume re.consume is not present
+    (($has_re_consume r1 ) false)
+  )
+)
+
+
+; It consumes the string as much as it can. If the regular expression/string has a variable and we cannot handle it by derivatives
+; then we returns an equivalent term (str.in_re ss rr).
+; which tells us that we still have ss of string left with rr as the regular expression after consumption
+; We are doing so to implement Brzozowski derivative based consume function. For normal eval-brzo rule, we should ideally never run into the str.in_re case,
+; so the same function will work there well and the remaining string will be "".
+(program $str_eval_inverse_str_re_rec ((c1 Char) (clst Char :list) (s1 String) (s2 String) (ss String :list) (r1 RegLan) (r2 RegLan) (rr RegLan :list))
+  (String RegLan) RegLan
+  (
+    (($str_eval_inverse_str_re_rec s1 re.none)         re.none)                                 ; the inverse of re.none is re.none no matter what s1 is. This can also handle s1 which opaque variables, for example.
+    (($str_eval_inverse_str_re_rec "" r1)   r1)
+          ; assume that s1 has length 1 due to normalization
+    (($str_eval_inverse_str_re_rec (str.++ s1 ss) r1)   (eo::define ((r2 ($str_eval_inverse_char_re_rec s1 r1)))
+                                                          (eo::ite (eo::is_eq ($has_re_consume r2) true) ; if computing the inverse failed then
+                                                            (str.in_re (str.++ s1 ss) r1)
+                                                            ($str_eval_inverse_str_re_rec ss r2)
+                                                          )
+                                                        )
+    )
+  )
+)
+
+; program assumes that the membership can be evaluated fully.
+; It is used by str-in-re-eval rule.
+; It computes the derivative w.r.t the string and then returns the result of checking if
+; "" is in the final regular expression.
+(program $str_eval_brzozowski_mem_check ((s String) (r RegLan))
+  (String RegLan) Bool
+  (
+   (($str_eval_brzozowski_mem_check s r) ($str_eval_epsilon_in_re_rec  ($str_eval_inverse_str_re_rec s r)))
+  )
+)
+
+; Idea: Before applying $str_eval_brzozowski_mem_check, we have to normalize the string and the regular expression.
+; define: $str_eval_str_in_re
+; args:
+; - s String: The string to inspect.
+; - r RegLan: The regular expression to inspect.
+; return: >
+;   true if s is in regular expression r. Does not evaluate if s is not a string
+;   literal.
+(define $str_eval_str_in_re_brzo ((s String) (r RegLan))
+  (eo::define ((ss ($normalize_string false s)))  ; takes "abcd" --> str.++ "abcd" "" -> (str.++ "a") (str.++ "b"  (... ))
+     (eo::define ((rr ($re_flatten_str_deep false ($re_to_flat_form r false))))
+        ($str_eval_brzozowski_mem_check ss rr)
+     )
+  )
+)
+
+;;;;;;;;;;;;;;;;;;;; Main functions for Brzozowski Derivative - END ;;;;;;;;;;;;;;;;;
+
+
+;;;;;;;;;;;;;;;;;;;; Brzozowski Derivative based `consume`  ;;;;;;;;;;;;;;;;;
+; Following code is for a variant str_re_consume based on Brzozowski derivatives. It does the same thing as consume, but using the derivatives
+
+; define: $str_re_consume_brzo
+; args:
+; - s String: The string argument of the membership to rewrite.
+; - r RegLan: The regular expression argument of the membership to rewrite.
+; returns: >
+;   false if `(str.in_re s r)` can be shown to be equivalent to false, or
+;   otherwise `(str.in_re sr rr)` where sr and rr are the result of "consuming"
+;   prefixes/suffixes from s and r. We consume from the end of s and r first by
+;   reversing them initially and converting them to flat forms. We then reverse
+;   them again and consume from the beginning of the remainder. Finally, we convert
+;   back from flat form when applicable.
+
+(define $str_re_consume_brzo ((s String) (r RegLan))
+  (eo::define ((ss ($normalize_string true s)))                ; ss is equivalent to reversed s; have to call normalize twice as str_rev changes the format. TODO: Include reversing in the str_flatten_deep
+  (eo::define ((rr ($re_flatten_str_deep true ($re_to_flat_form r false))))                ; rr is equivalent to reversed r
+  (eo::match ((reduced_ss String) (reduced_rr RegLan))
+      ($str_eval_inverse_str_re_rec ss rr)
+      (
+        ((str.in_re reduced_ss reduced_rr)
+                          (eo::define ((ss_reversed  ($normalize_string true reduced_ss)) (rr_reversed ($re_flatten_str_deep true reduced_rr)))
+                            (eo::match ((final_s String) (final_r RegLan))
+                              ($str_eval_inverse_str_re_rec ss_reversed rr_reversed)
+                              (
+                                ((str.in_re final_s final_r)  (str.in_re ($str_from_flat_form final_s false) ($undo_re_flatten_str_deep false final_r)))
+                                (final_r                      ($str_eval_epsilon_in_re_rec final_r))
+                              )
+                            )
+                          )
+        )
+        (reduced_rr                 ($str_eval_epsilon_in_re_rec reduced_rr))                       ; We consumed the whole string (or found a contradiction while doing so), so we can test membership
+      )
+  )))
+)
+
+;;;;; End of AWS Updates
