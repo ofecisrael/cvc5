@@ -270,12 +270,12 @@
 ; return: >
 ;   true if s is in regular expression r. Does not evaluate if s is not a string
 ;   literal.
-(define $str_eval_str_in_re ((s String) (r RegLan))
+(define $str_eval_str_in_re2 ((s String) (r RegLan))
   (eo::ite (eo::is_str s)
-    ($str_eval_str_in_re_rec s 0 0 r @re.null)
+    ($str_eval_str_in_re_rec2 s 0 r @re.null)
     (str.in_re s r)))
 
-  (define $str_eval_str_in_re2 ((s String) (r RegLan))
+(define $str_eval_str_in_re2 ((s String) (r RegLan))
   (eo::ite (eo::is_str s)
     ($str_eval_str_in_re_rec2 s 0 0 r @re.null)
     (str.in_re s r)))
