@@ -83,16 +83,16 @@
 )
 
 (program $str_eval_str_in_re_nfa ((r RegLan) (s String))
-  (String RegLan) Bool
+  :signature (String RegLan) Bool
   (
-    ;(($str_eval_str_in_re_nfa s r)  ($get_trans_rec r (nfa.list nfa.end)))
     (($str_eval_str_in_re_nfa s r)  
-                                    (eo::ite ($is_extended r)
-                                    ($str_eval_str_in_re s r)
-                                    ($match "" s ($get_trans_rec r (nfa.list nfa.end)) nfa.end))
-                                    
+      (eo::define ((nfa ($get_trans_rec r (nfa.list nfa.end))))
+        (eo::ite (eo::is_ok nfa)
+          ($match "" s ($get_trans_rec r (nfa.list nfa.end)) nfa.end)
+          ($str_eval_str_in_re s r)
+        )
+      )
     )
   )
 )
-
 

@@ -154,17 +154,16 @@
   )
 )
 
-(program $str_eval_str_in_re_nfa ((r RegLan) (s String) (r1 RegLan) (rr RegLan :list))
-  (String RegLan) Bool
+(program $str_eval_str_in_re_nfa ((r RegLan) (s String))
+  :signature (String RegLan) Bool
   (
-    ;(($str_eval_str_in_re_nfa s r)  ($get_trans_rec r nfa.decline "s" "a"))
-
-    (($str_eval_str_in_re_nfa s (re.inter r1 rr))  (eo::and ($str_eval_str_in_re_nfa s r1) ($str_eval_str_in_re_nfa s rr)))
-
-    (($str_eval_str_in_re_nfa s (re.comp r1))  (eo::not ($str_eval_str_in_re_nfa s r1)))
-
-    (($str_eval_str_in_re_nfa s (re.diff r1 rr))  (eo::and ($str_eval_str_in_re_nfa s r1) (eo::not ($str_eval_str_in_re_nfa s rr))))
-
-    (($str_eval_str_in_re_nfa s r)  ($str_in_nfa s ($get_trans_rec r nfa.decline "s" "a")))
+    (($str_eval_str_in_re_nfa s r)  
+      (eo::define ((nfa ($get_trans_rec r nfa.decline "s" "a")))
+        (eo::ite (eo::is_ok nfa)
+          ($str_in_nfa s nfa)
+          ($str_eval_str_in_re s r)
+        )
+      )
+    )
   )
 )

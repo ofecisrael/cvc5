@@ -1,0 +1,146 @@
+; 150s 0 timeouts 0 memouts 5074.3  460806.8
+(include "../programs/Strings.eo")
+
+(program $nullable ((r1 RegLan) (r2 RegLan) (rr RegLan :list))
+  (RegLan) Bool
+  (
+    (($nullable re.all)                     true)
+    (($nullable @re.empty)                  true)
+    (($nullable (re.* r1))                  true)
+    (($nullable (re.union r1 rr))           (eo::or ($nullable r1) ($nullable rr)))
+    (($nullable (re.inter r1 rr))           (eo::and ($nullable r1) ($nullable rr)))
+    (($nullable (re.++ r1 rr))              (eo::and ($nullable r1) ($nullable rr)))
+    (($nullable (re.comp r1))               (eo::not ($nullable r1)))
+    (($nullable r1)                         false)
+  )
+)
+
+(program $to_union ((r1 RegLan) (rr RegLan :list))
+  (RegLan) RegLan
+  (
+    (($to_union (re.union r1 rr))        (re.union r1 rr))
+    (($to_union re.none)                 re.none)
+    (($to_union r1)                      (re.union r1))
+  )
+)
+
+(program $to_inter ((r1 RegLan) (rr RegLan :list))
+  (RegLan) RegLan
+  (
+    (($to_inter (re.inter r1 rr))        (re.inter r1 rr))
+    (($to_inter re.all)                  re.all)
+    (($to_inter r1)                      (re.inter r1))
+  )
+)
+
+
+
+(program $dedup_union_rec3 ((r1 RegLan) (r2 RegLan) (rr1 RegLan :list) (rr2 RegLan :list))
+  (RegLan RegLan) RegLan
+  (
+     (($dedup_union_rec3 (re.union r1 rr1) (re.union r2 rr2))  
+        (eo::list_setof re.union (eo::list_concat re.union (re.union r1 rr1) (re.union r2 rr2)))
+     )
+     (($dedup_union_rec3 (re.union r1 rr1) r2)                (eo::ite (eo::is_neg (eo::list_find re.union (re.union r1 rr1) r2))
+                                                      (eo::cons re.union r2 (re.union r1 rr1))
+                                                      (re.union r1 rr1))
+                                                    )
+     (($dedup_union_rec3 r2 (re.union r1 rr1))         ($dedup_union_rec3 (re.union r1 rr1) r2)
+                                                    )
+     (($dedup_union_rec3 r1 r2)                (re.union r1 r2))
+  )
+)
+
+(program $dedup_inter_rec3 ((r1 RegLan) (r2 RegLan) (rr1 RegLan :list) (r3 RegLan) (r4 RegLan) (rr2 RegLan :list))
+  (RegLan RegLan) RegLan
+  (
+     (($dedup_inter_rec3 (re.inter r1 rr1) (re.inter r2 rr2))  
+        (eo::list_setof re.inter (eo::list_concat re.inter (re.inter r1 rr1) (re.inter r2 rr2)))
+     )
+     (($dedup_inter_rec3 (re.inter r1 rr1) r2)                (eo::ite (eo::is_neg (eo::list_find re.inter (re.inter r1 rr1) r2))
+                                                      (eo::cons re.inter r2 (re.inter r1 rr1))
+                                                      (re.inter r1 rr1))
+                                                    )
+     (($dedup_inter_rec3 r2 (re.inter r1 rr1))                (eo::ite (eo::is_neg (eo::list_find re.inter (re.inter r1 rr1) r2))
+                                                      (eo::cons re.inter r2 (re.inter r1 rr1))
+                                                      (re.inter r1 rr1))
+                                                    )
+     (($dedup_inter_rec3 r1 r2)                (re.inter r1 r2))
+  )
+)
+
+(program $re_nary_elim_union2 ((t RegLan) (ss RegLan :list))
+    (RegLan) RegLan
+    (
+        (($re_nary_elim_union2 (re.union t)) t)
+        (($re_nary_elim_union2 t)            t)
+    )
+)
+
+;(program $re_nary_elim_inter2 ((t RegLan) (ss RegLan :list))
+;    (RegLan) RegLan
+;    (
+;        (($re_nary_elim_inter2 (re.inter t)) t)
+;        (($re_nary_elim_inter2 t)            t)
+;    )
+;)
+
+(program $dedup_concat2 ((r1 RegLan) (rr1 RegLan :list) (r2 RegLan) (rr2 RegLan :list))
+  (RegLan RegLan) RegLan
+  (
+     (($dedup_concat2  (re.++ r1 rr1) (re.++ r2 rr2))  (eo::list_concat re.++ (re.++ r1 rr1) (re.++ r2 rr2)))
+     (($dedup_concat2  re.none r2)  re.none)
+     (($dedup_concat2 r1 (re.++ r2 rr2)) (eo::cons re.++ r1 (re.++ r2 rr2)))
+     (($dedup_concat2 r1 r2) (re.++ r1 r2))
+  )
+)
+
+(program $derivative ((c String) (s1 String) (s2 String) (rr RegLan :list) (r1 RegLan))
+  :signature (String RegLan) RegLan
+  (
+    (($derivative c re.none) re.none)
+    (($derivative c @re.empty) re.none)
+    (($derivative c re.all) re.all)
+    (($derivative c re.allchar) @re.empty)
+    (($derivative c (str.to_re s1)) (eo::ite (eo::is_eq (eo::extract s1 0 0) c) (str.to_re (eo::extract s1 1 (eo::add -1 (eo::len s1)))) re.none))
+    (($derivative c (re.range s1 s2)) (eo::ite (eo::and ($compare_geq (eo::to_z c) (eo::to_z s1)) ($compare_geq (eo::to_z s2) (eo::to_z c))) @re.empty re.none))
+
+    ;(($derivative c (re.union r1)) ($derivative c r1) )
+    (($derivative c (re.inter re.none rr)) re.none)
+   ;(($derivative c (re.++ re.none rr)) re.none)
+
+    (($derivative c (re.inter r1)) ($derivative c r1) )
+    (($derivative c (re.++ r1)) ($derivative c r1) )
+    (($derivative c (re.++ @re.empty rr)) ($derivative c rr) )
+
+    ;(($derivative c (re.union r1 rr)) ($re_nary_elim_union($dedup_union_rec2 ($derivative c rr) ($derivative c r1))))
+    ;(($derivative c (re.union r1 rr)) (eo::list_setof re.union (eo::list_concat re.union ($to_union ($derivative c r1)) ($to_union ($derivative c rr)) )))
+    ;(($derivative c (re.union r1 rr))  ($dedup_union_rec3 ($derivative c r1) ($derivative c rr) ))
+
+    (($derivative c (re.union r1 rr)) ($re_nary_elim_union2 ($dedup_union_rec3 ($derivative c r1) ($derivative c rr) )))
+    (($derivative c (re.inter r1 rr))   ($dedup_inter_rec3 ($derivative c r1) ($derivative c rr) ))
+    ;(($derivative c (re.inter r1 rr)) (eo::list_setof re.inter (eo::list_concat re.inter ($to_inter ($derivative c r1)) ($to_inter ($derivative c rr)) )))
+
+    (($derivative c (re.comp (re.comp r1))) ($derivative c r1))
+    (($derivative c (re.comp r1)) (re.comp ($derivative c r1)))
+    (($derivative c (re.* (re.* r1))) ($derivative c (re.* r1)))
+    (($derivative c (re.* r1)) ($dedup_concat2 ($derivative c r1) (re.* r1)))
+
+    (($derivative c (re.++ r1 rr))
+      (eo::ite ($nullable r1)
+        ;(eo::list_setof re.union (eo::list_concat re.union ($to_union ($derivative c rr) ) ($to_union ($dedup_concat2 ($derivative c r1) rr))))
+        ($re_nary_elim_union2 ($dedup_union_rec3 ($derivative c rr)  ($dedup_concat2 ($derivative c r1) rr)))
+        ;(re.union ($derivative c rr) ($flatten_concat2 (re.++ ($derivative c r1) rr)) )
+        ($dedup_concat2 ($derivative c r1) rr)
+      )
+    )
+  )
+)
+
+(program $str_eval_str_in_re_deriv ((s String) (r RegLan))
+  :signature (String RegLan) Bool
+  (
+    (($str_eval_str_in_re_deriv "" r) ($nullable r))
+    (($str_eval_str_in_re_deriv s r) ($str_eval_str_in_re_deriv (eo::extract s 1 (eo::add -1 (eo::len s))) ($derivative (eo::extract s 0 0) r)))
+  )
+)
