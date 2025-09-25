@@ -69,19 +69,6 @@
   )
 )
 
-(program $is_extended ((r RegLan) (rr RegLan :list))
-  (RegLan) Bool
-  (
-    (($is_extended (re.union r rr)) (eo::or ($is_extended r) ($is_extended rr)))
-    (($is_extended (re.++ r rr)) (eo::or ($is_extended r) ($is_extended rr)))
-    (($is_extended (re.* r)) ($is_extended r))
-    (($is_extended (re.comp r)) true)
-    (($is_extended (re.inter r rr)) true)
-    (($is_extended (re.+ r)) ($is_extended r))
-    (($is_extended r) false)
-  )
-)
-
 (program $str_eval_str_in_re_nfa ((r RegLan) (s String))
   :signature (String RegLan) Bool
   (
