@@ -1,0 +1,66 @@
+(program $nullable ((r1 RegLan) (rr RegLan :list))
+  :signature (RegLan) Bool
+  (
+    (($nullable re.all)                     true)
+    (($nullable @re.empty)                  true)
+    (($nullable (re.* r1))                  true)
+    (($nullable (re.union r1 rr))           (eo::or ($nullable r1) ($nullable rr)))
+    (($nullable (re.inter r1 rr))           (eo::and ($nullable r1) ($nullable rr)))
+    (($nullable (re.++ r1 rr))              (eo::and ($nullable r1) ($nullable rr)))
+    (($nullable (re.comp r1))               (eo::not ($nullable r1)))
+    (($nullable r1)                         false)
+  )
+)
+
+(program $in_list ((t (-> RegLan RegLan)) (r1 RegLan) (r2 RegLan) (rr1 RegLan :list) (rr2 RegLan :list))
+  :signature (Type RegLan RegLan) Bool
+  (
+    (($in_list re.union re.none r1)                 r1) 
+    (($in_list re.inter re.none r1)                 re.none) 
+    (($in_list t r1 r1)                 r1) 
+    (($in_list t (t r1 rr1) (t r2 rr2))  (eo::list_concat t (eo::list_diff t (t r1 rr1) (t r2 rr2)) (t r2 rr2)))
+    (($in_list t (t r1 rr1) r2)  (eo::ite (eo::is_neg (eo::list_find t (t r1 rr1) r2)) (eo::cons t r2 (t r1 rr1)) (t r1 rr1)))
+    (($in_list t r2 (t r1 rr1) )  (eo::ite (eo::is_neg (eo::list_find t (t r1 rr1) r2)) (eo::cons t r2 (t r1 rr1)) (t r1 rr1)))
+    (($in_list t r1 r2)                 (t r1 (t r2 (eo::nil t RegLan))))
+  )
+)
+
+(program $dedup_concat2 ((r1 RegLan) (rr1 RegLan :list) (r2 RegLan) (rr2 RegLan :list))
+  :signature (RegLan RegLan) RegLan
+  (
+     (($dedup_concat2 (re.++ r1 rr1) (re.++ r2 rr2))  (eo::list_concat re.++ (re.++ r1 rr1) (re.++ r2 rr2)))
+     (($dedup_concat2 re.none r1)  re.none)
+     (($dedup_concat2 r1 (re.++ r2 rr2)) (eo::cons re.++ r1 (re.++ r2 rr2)))
+     (($dedup_concat2 @re.empty r1) r1)
+     (($dedup_concat2 r1 @re.empty) r1)
+     (($dedup_concat2 r1 r2) (re.++ r1 r2))
+  )
+)
+
+(program $derivative ((c String) (s1 String) (s2 String) (rr RegLan :list) (r1 RegLan))
+  :signature (String RegLan) RegLan
+  (   
+    (($derivative c (re.union r1 rr)) ($in_list re.union ($derivative c r1) ($derivative c rr) ))
+    (($derivative c (re.inter r1 rr)) ($in_list re.inter ($derivative c r1) ($derivative c rr) ))
+    (($derivative c (re.comp r1))     (re.comp ($derivative c r1)))
+    (($derivative c (re.* r1))        ($dedup_concat2 ($derivative c r1) (re.* r1)))
+    (($derivative c (str.to_re s1))   (eo::ite (eo::is_eq (eo::extract s1 0 0) c) (str.to_re (eo::extract s1 1 (eo::add -1 (eo::len s1)))) re.none))
+    (($derivative c (re.range s1 s2)) (eo::ite (eo::and ($compare_geq (eo::to_z c) (eo::to_z s1)) ($compare_geq (eo::to_z s2) (eo::to_z c))) @re.empty re.none))
+    (($derivative c re.none)          re.none)
+    (($derivative c @re.empty)        re.none)
+    (($derivative c re.all)           re.all)
+    (($derivative c re.allchar)       @re.empty)
+    (($derivative c (re.++ r1 rr))    (eo::ite ($nullable r1)
+                                        ($in_list re.union ($derivative c rr) ($dedup_concat2 ($derivative c r1) rr))
+                                        ($dedup_concat2 ($derivative c r1) rr)))
+  )
+)
+
+(program $str_eval_str_in_re_deriv ((s String) (r RegLan))
+  :signature (String RegLan) Bool
+  (
+    (($str_eval_str_in_re_deriv "" r) ($nullable r))
+    (($str_eval_str_in_re_deriv s re.none) false)
+    (($str_eval_str_in_re_deriv s r) ($str_eval_str_in_re_deriv (eo::extract s 1 (eo::add -1 (eo::len s))) ($derivative (eo::extract s 0 0) r)))
+  )
+)
