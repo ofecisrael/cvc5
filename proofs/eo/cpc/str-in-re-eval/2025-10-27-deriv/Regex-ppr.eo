@@ -19,23 +19,23 @@
 
 ; program: $ac_merge
 ; args:
-; - t (-> RegLan RegLan): The constructor for the Associative and Commutative (AC) operator (e.g., re.union, re.inter).
+; - t (-> RegLan RegLan RegLan): The constructor for the Associative and Commutative (AC) operator (e.g., re.union, re.inter).
 ; - r1 RegLan: A regular language term.
-; - r2 RegLan: Another regular language term.
 ; - rr1 RegLan :list: A list of regular language terms for the first argument.
+; - r2 RegLan: Another regular language term.
 ; - rr2 RegLan :list: A list of regular language terms for the second argument.
 ; returns: RegLan
-;   A function to **canonicalize** the construction of an AC list-like regular expression operator (like union or intersection). This includes **flattening** nested structures and handling **identity** elements.
-(program $ac_merge ((t (-> RegLan RegLan RegLan)) (r1 RegLan) (rr1 RegLan :list) (r2 RegLan) (rr2 RegLan :list))
-  :signature (Type RegLan RegLan) RegLan
+;   A function to flatten the construction of an AC list-like regular expression operator (like union or intersection).
+(program $ac_merge ((f (-> RegLan RegLan RegLan)) (r1 RegLan) (rr1 RegLan :list) (r2 RegLan) (rr2 RegLan :list))
+  :signature ((-> RegLan RegLan RegLan) RegLan RegLan) RegLan
   (
     (($ac_merge re.union re.none r1)      r1)
     (($ac_merge re.inter re.none r1)      re.none)
-    (($ac_merge t r1 r1)                  r1)
-    (($ac_merge t (t r1 rr1) (t r2 rr2))  (eo::list_concat t (eo::list_diff t (t r1 rr1) (t r2 rr2)) (t r2 rr2)))
-    (($ac_merge t (t r1 rr1) r2)          (eo::ite (eo::is_neg (eo::list_find t (t r1 rr1) r2)) (eo::cons t r2 (t r1 rr1)) (t r1 rr1)))
-    (($ac_merge t r2 (t r1 rr1) )         (eo::ite (eo::is_neg (eo::list_find t (t r1 rr1) r2)) (eo::cons t r2 (t r1 rr1)) (t r1 rr1)))
-    (($ac_merge t r1 r2)                  (t r1 (t r2 (eo::nil t RegLan))))
+    (($ac_merge f r1 r1)                  r1)
+    (($ac_merge f (f r1 rr1) (f r2 rr2))  (eo::list_concat f (eo::list_diff f (f r1 rr1) (f r2 rr2)) (f r2 rr2)))
+    (($ac_merge f (f r1 rr1) r2)          (eo::ite (eo::is_neg (eo::list_find f (f r1 rr1) r2)) (eo::cons f r2 (f r1 rr1)) (f r1 rr1)))
+    (($ac_merge f r2 (t r1 rr1))          (eo::ite (eo::is_neg (eo::list_find f (f r1 rr1) r2)) (eo::cons f r2 (f r1 rr1)) (f r1 rr1)))
+    (($ac_merge f r1 r2)                  (f r1 (f r2 (eo::nil f RegLan))))
   )
 )
 
@@ -46,7 +46,7 @@
 ; - r2 RegLan: The second term of the concatenation.
 ; - rr2 RegLan :list: The list of remaining terms in the second concatenation (if r2 is nested).
 ; returns: RegLan
-;   A function for **canonicalizing** the **concatenation** (re.++) of two regular expressions, primarily by **flattening** nested concatenations and removing the **empty string** (@re.empty) and **empty set** (re.none) identities.
+;   A function to flatten the concatenation (re.++) of two regular expressions.
 (program $concat_merge ((r1 RegLan) (rr1 RegLan :list) (r2 RegLan) (rr2 RegLan :list))
   :signature (RegLan RegLan) RegLan
   (
@@ -67,7 +67,7 @@
 ; - r RegLan: The regular language expression.
 ; - rr RegLan :list: A list of regular language terms (for re.union/re.inter).
 ; returns: RegLan
-;   Computes the **Brzozowski derivative** $D_c(L)$ of a regular language $L$ with respect to a character $c$.
+;   Computes the Brzozowski derivative of a regular language with respect to a character c.
 (program $derivative ((c String) (s1 String) (s2 String) (r RegLan) (rr RegLan :list))
   :signature (String RegLan) RegLan
   (    
