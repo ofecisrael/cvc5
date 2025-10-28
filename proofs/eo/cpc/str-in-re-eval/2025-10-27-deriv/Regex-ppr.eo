@@ -2,7 +2,7 @@
 ; args:
 ; - r RegLan: The regular language to check.
 ; returns: Bool
-;   True if the regular language r contains the empty string (epsilon, $\epsilon$), false otherwise.
+;   Whether the regular language r contains the empty string.
 (program $nullable ((r RegLan) (rr RegLan :list))
   :signature (RegLan) Bool
   (
@@ -26,7 +26,7 @@
 ; - rr2 RegLan :list: A list of regular language terms for the second argument.
 ; returns: RegLan
 ;   A function to **canonicalize** the construction of an AC list-like regular expression operator (like union or intersection). This includes **flattening** nested structures and handling **identity** elements.
-(program $ac_merge ((t (-> RegLan RegLan)) (r1 RegLan) (rr1 RegLan :list) (r2 RegLan) (rr2 RegLan :list))
+(program $ac_merge ((t (-> RegLan RegLan RegLan)) (r1 RegLan) (rr1 RegLan :list) (r2 RegLan) (rr2 RegLan :list))
   :signature (Type RegLan RegLan) RegLan
   (
     (($ac_merge re.union re.none r1)      r1)
@@ -92,7 +92,8 @@
 ; - s String: The input string.
 ; - r RegLan: The regular language expression.
 ; returns: Bool
-;   Checks if the string $s$ is accepted by the regular language $L(r)$ using the **derivative method**. String $s$ is accepted if and only if the derivative $D_s(r)$ is nullable.
+;   Checks if the string s is accepted by the regular language L(r) using the derivative method.
+;   String s is accepted if and only if the derivative is nullable.
 (program $str_eval_str_in_re_deriv ((s String) (r RegLan))
   :signature (String RegLan) Bool
   (
