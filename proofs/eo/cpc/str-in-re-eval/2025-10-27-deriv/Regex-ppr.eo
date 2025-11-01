@@ -19,13 +19,13 @@
 
 ; program: $ac_merge
 ; args:
-; - t (-> RegLan RegLan RegLan): The constructor for the Associative and Commutative (AC) operator (e.g., re.union, re.inter).
+; - f (-> RegLan RegLan RegLan): The constructor for the Associative and Commutative (AC) operator (re.union, re.inter).
 ; - r1 RegLan: A regular language term.
 ; - rr1 RegLan :list: A list of regular language terms for the first argument.
 ; - r2 RegLan: Another regular language term.
 ; - rr2 RegLan :list: A list of regular language terms for the second argument.
 ; returns: RegLan
-;   A function to flatten the construction of an AC list-like regular expression operator (like union or intersection).
+;   A function to flatten the construction of an AC list regular expression operator.
 (program $ac_merge ((f (-> RegLan RegLan RegLan)) (r1 RegLan) (rr1 RegLan :list) (r2 RegLan) (rr2 RegLan :list))
   :signature ((-> RegLan RegLan RegLan) RegLan RegLan) RegLan
   (
@@ -42,20 +42,20 @@
 ; program: $concat_merge
 ; args:
 ; - r1 RegLan: The first term of the concatenation.
-; - rr1 RegLan :list: The list of remaining terms in the first concatenation (if r1 is nested).
+; - rr1 RegLan :list: The list of remaining terms in the first concatenation.
 ; - r2 RegLan: The second term of the concatenation.
-; - rr2 RegLan :list: The list of remaining terms in the second concatenation (if r2 is nested).
+; - rr2 RegLan :list: The list of remaining terms in the second concatenation.
 ; returns: RegLan
 ;   A function to flatten the concatenation (re.++) of two regular expressions.
 (program $concat_merge ((r1 RegLan) (rr1 RegLan :list) (r2 RegLan) (rr2 RegLan :list))
   :signature (RegLan RegLan) RegLan
   (
     (($concat_merge (re.++ r1 rr1) (re.++ r2 rr2))  (eo::list_concat re.++ (re.++ r1 rr1) (re.++ r2 rr2)))
-    (($concat_merge re.none r1)                      re.none)
-    (($concat_merge r1 (re.++ r2 rr2))               (eo::cons re.++ r1 (re.++ r2 rr2)))
-    (($concat_merge @re.empty r1)                    r1)
-    (($concat_merge r1 @re.empty)                    r1)
-    (($concat_merge r1 r2)                           (re.++ r1 r2))
+    (($concat_merge re.none r1)                     re.none)
+    (($concat_merge r1 (re.++ r2 rr2))              (eo::cons re.++ r1 (re.++ r2 rr2)))
+    (($concat_merge @re.empty r1)                   r1)
+    (($concat_merge r1 @re.empty)                   r1)
+    (($concat_merge r1 r2)                          (re.++ r1 r2))
   )
 )
 
@@ -89,7 +89,7 @@
 ; program: $str_eval_str_in_re_deriv
 ; args:
 ; - s String: The input string.
-; - r RegLan: The regular language expression.
+; - r RegLan: The regular expression.
 ; returns: Bool
 ;   Checks if the string s is accepted by the regular language L(r) using the derivative method.
 ;   String s is accepted if and only if the derivative is nullable.
