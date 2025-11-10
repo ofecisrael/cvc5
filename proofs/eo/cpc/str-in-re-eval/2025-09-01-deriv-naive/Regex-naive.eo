@@ -1,0 +1,47 @@
+(include "../programs/Strings.eo")
+
+(program $nullable ((s1 String) (s2 String) (rr RegLan :list) (r1 RegLan) (r2 RegLan))
+  (RegLan) Bool
+  (
+    (($nullable @re.null)                   false)
+    (($nullable re.all)                     true)
+    (($nullable re.none)                    false)
+    (($nullable @re.empty)                  true)
+    (($nullable (re.comp r1))               (eo::not ($nullable r1)))
+    (($nullable (re.range s1 s2))           false)
+    (($nullable re.allchar)                 false)
+    (($nullable (str.to_re s1))             (eo::is_eq s1 ""))
+    (($nullable (re.* r1))                  true)
+    (($nullable (re.union r1 rr))           (eo::ite ($nullable r1) true ($nullable rr)))
+    (($nullable (re.inter r1 rr))           (eo::ite ($nullable r1) ($nullable rr) false))
+    (($nullable (re.++ r1 rr))              (eo::ite ($nullable r1) ($nullable rr) false))
+  )
+)
+
+
+;;; Program to compute the derivative of a regex w.r.t. a character.
+(program $derivative
+  ((c String) (s String) (s1 String) (s2 String) (rr RegLan :list) (r1 RegLan))
+  :signature (String RegLan) RegLan
+  (
+    (($derivative c re.none) re.none)
+    (($derivative c @re.empty) re.none)
+    (($derivative c re.all) re.all)
+    (($derivative c re.allchar) @re.empty)
+    (($derivative c (str.to_re s)) (eo::ite (eo::is_eq (eo::len s) 0) re.none (eo::ite (eo::is_eq (eo::extract s 0 0) c) (str.to_re (eo::extract s 1 (eo::add -1 (eo::len s)))) re.none)))
+    (($derivative c (re.range s1 s2)) (eo::ite (eo::and ($compare_geq (eo::to_z c) (eo::to_z s1)) ($compare_geq (eo::to_z s2) (eo::to_z c))) @re.empty re.none))
+    (($derivative c (re.union r1 rr)) (re.union ($derivative c r1) ($derivative c rr)))
+    (($derivative c (re.inter r1 rr)) (re.inter ($derivative c r1) ($derivative c rr)))
+    (($derivative c (re.comp r1)) (re.comp ($derivative c r1)))
+    (($derivative c (re.* r1)) (re.++ ($derivative c r1) (re.* r1)))
+    (($derivative c (re.++ r1 rr)) (eo::ite ($nullable r1) (re.union ($derivative c rr) (re.++ ($derivative c r1) rr)) (re.++ ($derivative c r1) rr)))
+  )
+)
+
+(program $str_eval_str_in_re_deriv ((s String) (r RegLan))
+  :signature (String RegLan) Bool
+  (
+    (($str_eval_str_in_re_deriv "" r) ($nullable r))
+    (($str_eval_str_in_re_deriv s r) ($str_eval_str_in_re_deriv (eo::extract s 1 (eo::add -1 (eo::len s))) ($derivative (eo::extract s 0 0) r)))   
+  )
+)
