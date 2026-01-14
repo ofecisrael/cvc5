@@ -12,6 +12,35 @@
 #
 # The build system configuration.
 ##
+set(regress_10_tests
+  regress10/dsl-no-eval.smt2
+  regress10/instance15449.smt2
+  regress10/issue5428-re-diff-assoc.smt2
+  regress10/loop-wrong-sem.smt2
+  regress10/norn-31.smt2
+  regress10/norn-simp-rew.smt2
+  regress10/proj-issue409-re-loop-none.smt2
+  regress10/re-consume-bi-dir.smt2
+  regress10/re-consume-inter.smt2
+  regress10/re-consume-sym.smt2
+  regress10/re-consume-sym-sigma.smt2
+
+  regress10/issue6690-re-enum.smt2
+  regress10/cee-norn-aes-trivially.smt2
+  regress10/instance1079-re-loop-cong.smt2
+  regress10/issue2982.smt2
+  regress10/issue3090.smt2
+  regress10/issue6214-3-sym-re-inc.smt2
+  regress10/issue6214-4-sym-re-inc.smt2
+  regress10/issue6604-2.smt2
+  regress10/issue6635-rre.smt2
+  regress10/issue6973-dup-lemma-conc.smt2
+  regress10/norn-ab.smt2
+  regress10/re-mod-eq.smt2
+  regress10/regexp-050-multiply-graft-fuzz-dd.smt2
+  regress10/regexp-strat-fix.smt2
+  regress10/username_checker_min.smt2
+)
 
 # Regression level 0 tests
 set(regress_0_tests
@@ -4402,6 +4431,10 @@ macro(cvc5_add_regression_test level file)
 endmacro()
 
 set(RUN_REGRESSION_ARGS ${RUN_REGRESSION_ARGS} --use-skip-return-code)
+
+foreach(file ${regress_10_tests})
+  cvc5_add_regression_test(10 ${file})
+endforeach()
 
 foreach(file ${regress_0_tests})
   cvc5_add_regression_test(0 ${file})
